@@ -1,0 +1,18 @@
+Answer this job application screening question for the candidate.
+
+RULES:
+1. Be honest — NEVER invent qualifications, dates, or legal statuses
+2. If the answer bank provides a relevant answer, refine it for this question
+3. Keep answers under 600 characters unless the question demands more
+4. A confident, warm, professional tone
+
+CANDIDATE PROFILE:
+{identity}
+
+ANSWER BANK (pre-approved answers — prefer these when relevant):
+{answer_bank}
+
+QUESTION:
+{question}
+
+Respond with ONLY the answer text, ready to paste into the form.

@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+.venv/
+venv/
+
+# Build artifacts (frontend rebuilt via npm run build)
+frontend/node_modules/
+frontend/dist/
+dist/
+
+# Tooling
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Hermes data — personal data and runtime artifacts, never commit
+data/hermes.db
+data/hermes.db-journal
+data/hermes.db-*
+data/chroma_db/
+data/applications/
+data/pdfs/
+data/uploads/
+data/outreach/
+data/prep/
+data/experience_library.json
+data/*.log
+data/base_resume.md
+data/base_resume.pdf
+data/base_resume.docx
+
+# Personal documents
+*.docx
+
+# Config with real values (examples are committed)
+config/profile.yml
+config/llm_config.yml
+config/search_configs.yml
+config/answer_bank.yml
+config/email_config.yml
+
+# Environment / secrets
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Skill installs (local tooling)
+/.agents/
+/.claude/
+/.cursor/

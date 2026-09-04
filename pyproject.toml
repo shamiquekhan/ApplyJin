@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hermes-agent"
+version = "0.1.0"
+description = "Self-learning job application agent: auto-tailor + auto-fill, human clicks submit."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Hermes Contributors" }]
+dependencies = [
+    "typer>=0.12",
+    "rich>=13.7",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "pyyaml>=6.0",
+    "rapidfuzz>=3.9",
+    "pandas>=2.2",
+    "python-dateutil>=2.9",
+    "litellm>=1.40",
+]
+
+[project.optional-dependencies]
+scrape = ["python-jobspy>=1.1.70"]
+rag = ["chromadb>=0.5", "sentence-transformers>=3.0"]
+pdf = ["pdfplumber>=0.11", "weasyprint>=61"]
+browser = ["playwright>=1.45"]
+web = ["fastapi>=0.111", "uvicorn>=0.30", "python-multipart>=0.0.9"]
+dev = ["pytest>=8.2", "pytest-cov>=5.0"]
+all = [
+    "python-jobspy>=1.1.70",
+    "chromadb>=0.5",
+    "sentence-transformers>=3.0",
+    "pdfplumber>=0.11",
+    "weasyprint>=61",
+    "playwright>=1.45",
+    "fastapi>=0.111",
+    "uvicorn>=0.30",
+    "python-multipart>=0.0.9",
+]
+
+[project.scripts]
+hermes = "hermes.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["hermes*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

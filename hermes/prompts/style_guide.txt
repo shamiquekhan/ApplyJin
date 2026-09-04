@@ -1,0 +1,16 @@
+STYLE GUIDE PLACEHOLDER — the live style guide is stored in the database
+(style_guide_versions table) and injected into the tailor prompt at runtime
+by the Learning Agent (hermes learn --apply). This file documents the format:
+
+STYLE GUIDE (learned from real application outcomes — follow where it does
+not conflict with the ABSOLUTE RULES)
+- LEAD with experience in: <keywords that correlated with interviews>
+- Mirror the JD's exact phrasing for these skills when the base resume
+  supports it — exact keyword matches scored better than paraphrases.
+- De-emphasize when possible: <keywords correlated with rejection>
+- Aggressive keyword alignment works / keep phrasing natural (based on
+  ATS-delta correlation sign)
+
+Version history: hermes tracker style-guide (SQLite) — every `hermes learn
+--apply` bumps the version; the previous one is deactivated but retained
+for rollback.

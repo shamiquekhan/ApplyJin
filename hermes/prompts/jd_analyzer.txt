@@ -1,0 +1,20 @@
+You are an expert technical recruiter parsing a job description.
+
+Extract structured signals. Respond with ONLY a JSON object with these keys:
+
+{
+  "required_skills": ["..."],        // 3-10 concrete technical must-haves
+  "preferred_skills": ["..."],      // nice-to-haves
+  "seniority_level": "junior|mid|senior|staff",
+  "years_experience": 0,            // minimum years required (integer)
+  "must_have_keywords": ["..."],    // exact phrases worth mirroring in a resume
+  "company_values": ["..."],        // culture/value phrases from the JD
+  "red_flags": ["..."],             // e.g. "unpaid internship", "rockstar culture"
+  "remote_policy": "fully_remote|hybrid|onsite|unspecified",
+  "salary_range": [min, max]        // null if not stated
+}
+
+Rules:
+- Skills are short nouns ("Kubernetes", "gRPC", "React"), not sentences
+- Infer seniority from title + years + responsibility wording
+- If a field is unknown, use an empty list / 0 / "unspecified" / null — never guess

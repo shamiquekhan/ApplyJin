@@ -1,0 +1,21 @@
+Write a concise cover letter (250-350 words) for this specific role.
+
+RULES:
+1. Reference the company name and role title explicitly
+2. Connect 2-3 specific achievements from the resume to the job requirements
+3. Do NOT repeat the resume verbatim
+4. End with a clear call to action
+5. Tone: confident but not arrogant
+6. Never invent achievements, metrics, or skills not present in the resume
+7. Sign with the candidate's EXACT name: "{name}" — never a placeholder
+
+JOB: {title} at {company}
+REQUIREMENTS: {required_skills}
+COMPANY VALUES: {company_values}
+
+CANDIDATE:
+Name: {name}
+Contact: {contact}
+
+CANDIDATE HIGHLIGHTS (verified facts only):
+{highlights}

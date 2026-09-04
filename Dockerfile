@@ -15,17 +15,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Backend install (scrape/rag/pdf/web extras — no playwright/browser)
+# Backend install. NOTE: chromadb is installed directly (not via the
+# `rag` extra) because that extra pulls sentence-transformers -> torch
+# (~2GB, too heavy for Render's free builder). The runtime uses
+# ChromaDB's bundled ONNX MiniLM embedder — real semantic embeddings
+# with zero torch dependency.
 COPY pyproject.toml README.md LICENSE ./
 COPY hermes ./hermes
 COPY config ./config
 COPY scripts ./scripts
-RUN pip install --no-cache-dir -e ".[scrape,rag,pdf,web]"
+RUN pip install --no-cache-dir -e ".[scrape,pdf,web]" chromadb
 
-# Frontend build (landing + Console) — built on the host or in CI and
-# committed is NOT required; Render builds it here so / serves the SPA.
+# Frontend build (landing page + Console) so the backend can serve the
+# full SPA at / and /dashboard from one origin. Vite needs dev deps,
+# which npm install includes by default.
 COPY frontend/package.json frontend/package-lock.json* ./frontend/
-RUN cd frontend && npm install --silent 2>/dev/null || true
+RUN cd frontend && npm install --silent
 COPY frontend ./frontend
 RUN cd frontend && npm install --silent && npx vite build
 

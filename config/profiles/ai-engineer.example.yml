@@ -1,0 +1,27 @@
+# Named profile example: hermes --profile ml-research run
+# Copy to config/profiles/<name>.yml — everything else mirrors profile.yml,
+# plus per-profile resume + search configs.
+
+resume_path: "data/base_resume.md"     # this profile's resume
+search_config_path: "config/search_configs.yml"
+
+identity:
+  name: "Shamique Khan"
+  email: "shamiquekhan18@gmail.com"
+  location: "Etawah, Uttar Pradesh, India"
+
+target:
+  titles: ["AI Engineer", "ML Engineer"]
+  seniority: "junior"
+  years_experience: 1
+
+skills:
+  ml_dl: [PyTorch, TensorFlow, "graph neural networks", "deep learning"]
+  llm: [LLMs, RAG, "prompt engineering"]
+
+preferences:
+  boards: ["indeed", "glassdoor", "google"]
+  remote_only: false
+
+limits:
+  min_fit_score: 0.5

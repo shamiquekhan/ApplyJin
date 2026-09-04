@@ -1,0 +1,22 @@
+services:
+  hermes:
+    build: .
+    container_name: hermes
+    volumes:
+      - ./data:/app/data                  # resume, tracker DB, artifacts
+      - ./config:/app/config              # profile + llm configs
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+    command: ["hermes", "run", "--offline=false"]
+    restart: "no"
+
+  dashboard:
+    build: .
+    container_name: hermes-dashboard
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    command: ["hermes", "serve", "--host", "0.0.0.0", "--port", "8000"]
+    restart: unless-stopped

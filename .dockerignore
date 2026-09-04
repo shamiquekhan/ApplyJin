@@ -1,0 +1,22 @@
+# Keep the build context small and the image build cache stable.
+.git
+.venv
+venv
+frontend/node_modules
+frontend/dist
+data
+*.db
+*.db-journal
+.env
+.env.*
+!.env.example
+config/profile.yml
+config/llm_config.yml
+config/search_configs.yml
+config/answer_bank.yml
+config/email_config.yml
+*.docx
+.pytest_cache
+__pycache__
+*.pyc
+nohup.out

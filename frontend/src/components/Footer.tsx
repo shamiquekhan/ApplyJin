@@ -8,7 +8,7 @@ const COLUMNS = [
       { label: "How it works", href: "#how-it-works" },
       { label: "Dashboard", href: "/dashboard" },
       { label: "Learning loop", href: "#how-it-works" },
-      { label: "Waitlist", href: "#inquiries" },
+      { label: "Console", href: "/dashboard" },
     ],
   },
   {
@@ -56,7 +56,7 @@ export function Footer() {
               href="#inquiries"
               className="group inline-flex w-fit items-center gap-2 text-primary text-sm border border-primary/30 rounded-full px-5 py-2.5 hover:bg-primary hover:text-black transition-colors"
             >
-              Join the waitlist
+              Open the Console
               <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
             </a>
           </div>

@@ -100,11 +100,6 @@ function form(data: Record<string, string | Blob>): FormData {
 export const fetchStats = () =>
   fetch(`${API_BASE}/api/public/stats`, { headers: authHeader() }).then((r) => handle<PublicStats>(r));
 
-export async function joinWaitlist(email: string): Promise<{ ok: boolean; message: string; duplicate: boolean }> {
-  const r = await fetch(`${API_BASE}/api/public/waitlist`, { method: "POST", body: form({ email, source: "landing", ...authHeader() }) });
-  return handle(r);
-}
-
 // -------- resumes
 export const listResumes = () =>
   fetch(`${API_BASE}/api/resumes`, { headers: authHeader() }).then((r) => handle<ResumeSummary[]>(r));

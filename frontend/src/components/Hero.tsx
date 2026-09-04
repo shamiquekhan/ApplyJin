@@ -1,31 +1,10 @@
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Check } from "lucide-react";
+import { motion } from "framer-motion";
+import { ArrowRight } from "lucide-react";
 import { WordsPullUp } from "./WordsPullUp";
-import { joinWaitlist } from "../lib/api";
 
 const NAV_ITEMS = ["How it works", "Dashboard", "Learning loop", "Inquiries"];
 
 export function Hero() {
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
-  const [note, setNote] = useState("");
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email.trim()) return;
-    setStatus("sending");
-    try {
-      const result = await joinWaitlist(email);
-      setNote(result.message);
-      setStatus("done");
-      setEmail("");
-    } catch (err) {
-      setNote(err instanceof Error ? err.message : "Something went wrong. Try again.");
-      setStatus("error");
-    }
-  }
-
   return (
     <section id="how-it-works" className="h-screen p-4 md:p-6">
       <div className="relative h-full w-full rounded-2xl md:rounded-[2rem] overflow-hidden">
@@ -86,7 +65,7 @@ export function Hero() {
               </h1>
             </div>
 
-            {/* Right 4 cols: description + waitlist */}
+            {/* Right 4 cols: description + CTA straight to the Console */}
             <div className="col-span-12 lg:col-span-4 flex flex-col gap-4 md:gap-6">
               <motion.p
                 className="text-primary/70 text-xs sm:text-sm md:text-base"
@@ -101,53 +80,20 @@ export function Hero() {
                 say on every submit.
               </motion.p>
 
-              {/* Waitlist — replaces dead CTA with a working form */}
-              <motion.form
-                onSubmit={submit}
-                className="w-full max-w-md"
+              <motion.a
+                href="/dashboard"
+                className="group inline-flex w-fit items-center gap-2 bg-primary rounded-full py-2 pl-5 pr-2 hover:gap-3 transition-all"
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.8, delay: 0.7, ease: [0.16, 1, 0.3, 1] }}
               >
-                <div className="flex items-center gap-2 bg-primary rounded-full pl-5 pr-2 py-2">
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    disabled={status === "sending" || status === "done"}
-                    aria-label="Email for the ApplyJin waitlist"
-                    className="flex-1 bg-transparent outline-none text-black placeholder-black/50 text-sm sm:text-base min-w-0"
-                  />
-                  <button
-                    type="submit"
-                    disabled={status === "sending" || status === "done"}
-                    className="bg-black rounded-full w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center shrink-0 hover:scale-110 transition-transform disabled:opacity-60"
-                    aria-label="Join the waitlist"
-                  >
-                    {status === "done" ? (
-                      <Check className="w-4 h-4 text-primary" />
-                    ) : (
-                      <ArrowRight className="w-4 h-4 text-primary" />
-                    )}
-                  </button>
-                </div>
-                <AnimatePresence>
-                  {note && (
-                    <motion.p
-                      initial={{ opacity: 0, y: -4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      className={`mt-2 text-xs px-2 ${
-                        status === "error" ? "text-red-400" : "text-primary/80"
-                      }`}
-                    >
-                      {note}
-                    </motion.p>
-                  )}
-                </AnimatePresence>
-              </motion.form>
+                <span className="text-black font-medium text-sm sm:text-base">
+                  Open the Console
+                </span>
+                <span className="bg-black rounded-full w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <ArrowRight className="w-4 h-4 text-primary" />
+                </span>
+              </motion.a>
             </div>
           </div>
         </div>

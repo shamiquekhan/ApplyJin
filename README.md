@@ -11,6 +11,7 @@
 [![React](https://img.shields.io/badge/React_18-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![Tailwind](https://img.shields.io/badge/Tailwind_CSS-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![Tests](https://img.shields.io/badge/tests-149%20passing-brightgreen)](#testing)
+[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey)](LICENSE)
 
 </div>
 
@@ -230,7 +231,11 @@ ApplyJin/
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+CC BY-NC 4.0 — Attribution-NonCommercial 4.0 International. See [LICENSE](LICENSE).
+
+You are free to use, modify, and share this project for **non-commercial**
+purposes with attribution. Commercial use requires a separate license from
+the author.
 
 ## Acknowledgments
 

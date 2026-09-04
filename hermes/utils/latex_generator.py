@@ -24,7 +24,10 @@ logger = logging.getLogger("hermes.latex")
 # ---------------------------------------------------------------- resume.cls
 
 _RESUME_CLS = r"""%% resume.cls — Hermes build of the classic Trey Hunner
-%% template (LaTeXTemplates.com, version 2.0). Provides rSection/rSubsection.
+%% "Medium Length Professional CV" template interface
+%% (http://www.treyhunner.com, via LaTeXTemplates.com, MIT licensed).
+%% The underlying template is distributed under its own MIT license;
+%% this project's code is CC BY-NC 4.0 (see LICENSE).
 
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesClass{resume}[2026/01/01 Hermes resume class]

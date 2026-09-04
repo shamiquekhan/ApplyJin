@@ -1,0 +1,41 @@
+# LLM chain: tried in order until one succeeds. Copy to llm_config.yml.
+# Keys read from this file OR environment variables (env wins).
+
+# provider: gemini | openrouter | groq | nvidia | openai | ollama
+# Get free keys:
+#   Gemini:      https://aistudio.google.com      (1M tokens/day, 15 RPM)
+#   OpenRouter:  https://openrouter.ai            (28 free models)
+#   NVIDIA NIM:  https://build.nvidia.com         (120+ models)
+#   Groq:        https://groq.com                 (fast open models)
+#   Ollama:      local, no key needed
+
+chain:
+  - provider: gemini
+    model: gemini/gemini-3.6-flash
+    api_key: ""            # or set GEMINI_API_KEY (loaded from .env)
+
+  # Gemini free-tier quota is PER MODEL (~20 RPM each) — listing several
+  # models multiplies your effective rate limit. The router rotates across
+  # them automatically.
+  - provider: gemini
+    model: gemini/gemini-flash-latest
+    api_key: ""
+
+  - provider: gemini
+    model: gemini/gemini-flash-lite-latest
+    api_key: ""
+
+  - provider: ollama
+    model: ollama/llama3.1
+    api_base: "http://localhost:11434"
+
+# Generation defaults.
+generation:
+  temperature: 0.3
+  max_tokens: 4096
+  timeout_seconds: 60
+
+# 429/timeout retry policy per provider.
+retries:
+  attempts: 2
+  backoff_seconds: 5

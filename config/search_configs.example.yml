@@ -1,0 +1,17 @@
+# Search configs: the scout runs each entry. Copy to search_configs.yml.
+searches:
+  - name: backend-remote
+    title: "Backend Engineer"
+    location: "Remote"
+    boards: ["indeed", "glassdoor", "google"]
+    max_results: 40
+    hours_old: 336          # 14 days
+    remote_only: true
+
+  - name: python-hybrid
+    title: "Python Developer"
+    location: "New York, NY"
+    boards: ["indeed", "linkedin"]
+    max_results: 20
+    hours_old: 168          # 7 days
+    remote_only: false

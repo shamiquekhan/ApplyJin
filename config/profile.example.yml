@@ -1,0 +1,37 @@
+# Your canonical profile. Copy to profile.yml and fill in real values.
+# Everything here is source-of-truth FACT for the resume tailor.
+
+identity:
+  name: "Jane Doe"
+  email: "jane@example.com"
+  phone: "+1 555 0100"
+  location: "Remote"
+  linkedin: "linkedin.com/in/janedoe"
+  github: "github.com/janedoe"
+
+# Target roles — used for seniority matching and cover letter framing.
+target:
+  titles: ["Software Engineer", "Backend Engineer", "Platform Engineer"]
+  seniority: "mid"        # junior | mid | senior | staff
+  years_experience: 5
+
+# Skills you ACTUALLY have. The tailor may never invent beyond this list.
+skills:
+  languages: ["Python", "Go", "SQL", "JavaScript"]
+  frameworks: ["FastAPI", "Django", "Flask", "React"]
+  infra: ["Docker", "Kubernetes", "AWS", "PostgreSQL", "Redis", "Terraform"]
+  practices: ["CI/CD", "TDD", "code review", "system design", "observability"]
+
+# Preferences used by the scout and fit scorer.
+preferences:
+  remote_only: false
+  min_salary: 0            # 0 = no filter
+  boards: ["indeed", "glassdoor", "google", "linkedin"]
+  max_results_per_board: 40
+  max_age_days: 14
+  blocked_companies: []    # never apply here
+
+# Guardrail defaults.
+limits:
+  max_applications_per_day: 20
+  min_fit_score: 0.65

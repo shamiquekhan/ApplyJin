@@ -1,0 +1,228 @@
+/** Full API client for the ApplyJin backend (Hermes FastAPI). */
+
+export interface PublicStats {
+  applications: number;
+  interviews: number;
+  response_rate: number;
+  waitlist: number;
+  style_guide_version: number | null;
+  boards_supported: number;
+  agents: number;
+}
+
+export interface ResumeSummary {
+  id: number;
+  name: string;
+  skills: string[];
+  created_at: string;
+  preview: string;
+}
+
+export interface ResumeDetail extends ResumeSummary {
+  content_md: string;
+  raw_text: string;
+}
+
+export interface JDSummary {
+  id: number;
+  title: string;
+  company: string;
+  preview: string;
+  created_at: string;
+}
+
+export interface KeywordBuckets {
+  hard_skills: string[];
+  soft_skills: string[];
+  tools: string[];
+  certifications: string[];
+  domain_keywords: string[];
+  extractor?: string;
+}
+
+export interface Scores {
+  keyword_match: number;
+  semantic_similarity: number;
+  overall: number;
+}
+
+export interface TailorResult {
+  tailored_resume_md: string;
+  scores_after: Scores;
+  delta: { overall: number; keyword_match: number; semantic: number };
+  guardrail_violations: string[];
+  validated: boolean;
+  model_used: string;
+}
+
+export interface ApplicationRow {
+  id: number;
+  status: string;
+  ats_before: number | null;
+  ats_after: number | null;
+  kw_before?: number | null;
+  kw_after?: number | null;
+  created_at: string;
+  resume_name: string;
+  jd_title: string;
+  jd_company: string;
+}
+
+async function handle<T>(r: Response): Promise<T> {
+  if (!r.ok) {
+    let message = `Request failed (${r.status})`;
+    try {
+      const body = await r.json();
+      message = body.detail || body.message || message;
+    } catch {
+      /* non-JSON error */
+    }
+    throw new Error(message);
+  }
+  return r.json() as Promise<T>;
+}
+
+function form(data: Record<string, string | Blob>): FormData {
+  const fd = new FormData();
+  Object.entries(data).forEach(([k, v]) => fd.append(k, v));
+  return fd;
+}
+
+// -------- public (landing)
+export const fetchStats = () =>
+  fetch("/api/public/stats").then((r) => handle<PublicStats>(r));
+
+export async function joinWaitlist(email: string): Promise<{ ok: boolean; message: string; duplicate: boolean }> {
+  const r = await fetch("/api/public/waitlist", { method: "POST", body: form({ email, source: "landing" }) });
+  return handle(r);
+}
+
+// -------- resumes
+export const listResumes = () =>
+  fetch("/api/resumes").then((r) => handle<ResumeSummary[]>(r));
+
+export const getResume = (id: number) =>
+  fetch(`/api/resumes/${id}`).then((r) => handle<ResumeDetail>(r));
+
+export const uploadResume = (file: File, name: string) => {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("name", name || file.name);
+  return fetch("/api/resumes/upload", { method: "POST", body: fd })
+    .then((r) => handle<{ id: number; bullets: number }>(r));
+};
+
+export const createResume = (name: string, content: string) =>
+  fetch("/api/resumes/create", { method: "POST", body: form({ name, content }) })
+    .then((r) => handle<{ id: number }>(r));
+
+// -------- job descriptions
+export const listJDs = () =>
+  fetch("/api/job-descriptions").then((r) => handle<JDSummary[]>(r));
+
+export const addJD = (title: string, company: string, content: string) =>
+  fetch("/api/job-descriptions", { method: "POST", body: form({ title, company, content }) })
+    .then((r) => handle<{ id: number }>(r));
+
+export const extractKeywords = (jdId: number) =>
+  fetch(`/api/job-descriptions/${jdId}/extract-keywords`, { method: "POST" })
+    .then((r) => handle<KeywordBuckets>(r));
+
+// -------- applications
+export const createApplication = (resumeId: number, jdId: number) =>
+  fetch("/api/applications", { method: "POST", body: form({ resume_id: String(resumeId), jd_id: String(jdId) }) })
+    .then((r) => handle<{ id: number; scores_before: Scores }>(r));
+
+export const tailorResume = (appId: number, keywords: string[]) =>
+  fetch(`/api/applications/${appId}/tailor`, {
+    method: "POST",
+    body: form({ selected_keywords: JSON.stringify(keywords) }),
+  }).then((r) => handle<TailorResult>(r));
+
+export const generateCoverLetter = (appId: number) =>
+  fetch(`/api/applications/${appId}/cover-letter`, { method: "POST" })
+    .then((r) => handle<{ cover_letter_md: string }>(r));
+
+export const listApplications = () =>
+  fetch("/api/applications").then((r) => handle<ApplicationRow[]>(r));
+
+export const downloadUrl = {
+  resume: (id: number) => `/api/applications/${id}/download-resume`,
+  cover: (id: number) => `/api/applications/${id}/download-cover-letter`,
+  latex: (id: number) => `/api/applications/${id}/download-resume-latex`,
+};
+
+// -------- master CV database
+export interface MasterProfile {
+  full_name?: string; email?: string; phone?: string; location?: string;
+  linkedin?: string; github?: string; website?: string;
+  headline?: string; summary?: string; years_experience?: number;
+}
+
+export interface MasterExperience {
+  id: number; title: string; organization: string; location: string;
+  start_date: string; end_date: string; description: string;
+  bullets: string[]; tags: string;
+}
+
+export interface MasterProject {
+  id: number; name: string; tech: string; description: string;
+  bullets: string[]; link: string; tags: string;
+}
+
+export interface MasterStats {
+  experiences: number; projects: number; education: number;
+  certifications: number; skills: number; profile_complete: boolean;
+}
+
+export const masterProfile = () =>
+  fetch("/api/master/profile").then((r) => handle<MasterProfile>(r));
+
+export const updateMasterProfile = (profile: Partial<MasterProfile>) =>
+  fetch("/api/master/profile", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(profile),
+  }).then((r) => handle<MasterProfile>(r));
+
+export const masterStats = () =>
+  fetch("/api/master/stats").then((r) => handle<MasterStats>(r));
+
+export const listMasterExperiences = () =>
+  fetch("/api/master/experiences").then((r) => handle<MasterExperience[]>(r));
+
+export const listMasterProjects = () =>
+  fetch("/api/master/projects").then((r) => handle<MasterProject[]>(r));
+
+export const listMasterSkills = () =>
+  fetch("/api/master/skills").then((r) => handle<Record<string, string[]>>(r));
+
+export const importMasterFromResume = (resumeId: number) =>
+  fetch("/api/master/import-resume", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ resume_id: resumeId }),
+  }).then((r) => handle<{ imported: Record<string, number>; stats: MasterStats }>(r));
+
+// -------- tailor v3 additions
+export interface SelectionEntry {
+  kind: string; title: string; score: number; matched_keywords: string[];
+}
+
+export interface TailorResultV3 extends TailorResult {
+  selection: SelectionEntry[];
+  skill_selection: string[];
+  gaps: string[];
+}
+
+export const tailorResumeV3 = (appId: number, keywords: string[]) =>
+  fetch(`/api/applications/${appId}/tailor`, {
+    method: "POST",
+    body: form({ selected_keywords: JSON.stringify(keywords) }),
+  }).then((r) => handle<TailorResultV3>(r));
+
+export const emailTemplate = (appId: number, templateType: string) =>
+  fetch(`/api/applications/${appId}/email-template`, {
+    method: "POST",
+    body: form({ template_type: templateType }),
+  }).then((r) => handle<{ email_md: string; hiring_manager?: string; emails: string[] }>(r));

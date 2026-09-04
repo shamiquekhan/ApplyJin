@@ -5,6 +5,7 @@ import * as api from "../lib/api";
 import { markdownToHtml } from "../lib/markdown";
 import type { ApplicationRow, KeywordBuckets, ResumeSummary, JDSummary, Scores, TailorResult, MasterStats, MasterExperience, MasterProject } from "../lib/api";
 import { navigate } from "../lib/router";
+import { fetchMe, logout } from "../lib/session";
 
 /* ---------- shared atoms (ApplyJin design system) ---------- */
 
@@ -483,12 +484,12 @@ function MasterPanel({ toast }: { toast: (t: string, error?: boolean) => void })
   }
 
   async function deleteExp(id: number) {
-    try { await fetch(`/api/master/experiences/${id}`, { method: "DELETE" }); refresh(); }
+    try { await api.del(`master/experiences/${id}`); refresh(); }
     catch { toast("Delete failed", true); }
   }
 
   async function deletePrj(id: number) {
-    try { await fetch(`/api/master/projects/${id}`, { method: "DELETE" }); refresh(); }
+    try { await api.del(`master/projects/${id}`); refresh(); }
     catch { toast("Delete failed", true); }
   }
 
@@ -681,16 +682,42 @@ type TabId = (typeof TABS)[number]["id"];
 export function Console() {
   const [tab, setTab] = useState<TabId>("master");
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
+  const [user, setUser] = useState<{ name: string; email: string; picture: string } | null>(null);
+  const [authState, setAuthState] = useState<"checking" | "open" | "locked" | "signed_in">("checking");
   const toast = useCallback((text: string, error?: boolean) => {
     setNote({ text, error });
     setTimeout(() => setNote(null), 3200);
   }, []);
 
+  useEffect(() => {
+    fetchMe()
+      .then((me) => {
+        if (!me.auth_enabled) setAuthState("open");
+        else if (me.user) {
+          setUser(me.user);
+          setAuthState("signed_in");
+        } else setAuthState("locked");
+      })
+      .catch(() => setAuthState("open")); // backend unreachable -> let panels show their own errors
+  }, []);
+
+  if (authState === "checking") {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-primary animate-spin" aria-label="Loading the Console" />
+      </div>
+    );
+  }
+
+  if (authState === "locked") {
+    return <LoginScreen />;
+  }
+
   return (
     <div className="min-h-screen bg-black p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         {/* header */}
-        <header className="flex items-center justify-between mb-8">
+        <header className="flex flex-wrap items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
             <button onClick={() => navigate("/")} className="flex items-center gap-2 text-primary/60 hover:text-primary transition-colors text-sm py-1.5" aria-label="Back to ApplyJin landing page">
               <ArrowLeft className="w-4 h-4" aria-hidden="true" /> ApplyJin
@@ -700,7 +727,24 @@ export function Console() {
               Console <span className="italic font-serif text-primary/70">where the agent works</span>
             </h1>
           </div>
-          <span className="text-[10px] px-3 py-1 rounded-full bg-primary/10 text-primary/70">self-learning agent</span>
+          <div className="flex items-center gap-3">
+            {user ? (
+              <div className="flex items-center gap-2">
+                {user.picture ? (
+                  <img src={user.picture} alt="" className="w-7 h-7 rounded-full border border-primary/20" />
+                ) : null}
+                <span className="text-xs text-primary/70 hidden sm:inline max-w-[10rem] truncate">{user.name || user.email}</span>
+                <button
+                  onClick={() => { logout(() => { setUser(null); setAuthState("locked"); }); }}
+                  className="text-xs px-3 py-1.5 rounded-full border border-primary/20 text-primary/70 hover:bg-primary/10 transition-colors min-h-[24px]"
+                >
+                  Sign out
+                </button>
+              </div>
+            ) : (
+              <span className="text-[10px] px-3 py-1 rounded-full bg-primary/10 text-primary/70">self-learning agent</span>
+            )}
+          </div>
         </header>
 
         {/* tabs */}

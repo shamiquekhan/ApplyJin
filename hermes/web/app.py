@@ -13,9 +13,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from hermes.config import load_dotenv, load_profile
@@ -81,8 +81,85 @@ def _master() -> "MasterStore":
 # Static assets
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-if FRONTEND_DIR.exists():
+if (FRONTEND_DIR / "assets").exists():
     app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIR / "assets")), name="assets")
+
+
+# ---------------------------------------------------------------- auth
+
+from fastapi import Request  # noqa: E402
+
+from hermes.web import auth as _auth  # noqa: E402
+
+
+@app.middleware("http")
+async def auth_gate(request: Request, call_next):
+    return await _auth.auth_middleware_dispatch(request, call_next, DB_PATH)
+
+
+def _callback_base(request: Request) -> str:
+    """The externally-visible backend origin (Render URL or localhost).
+
+    X-Forwarded-Proto takes precedence behind Render's TLS proxy.
+    """
+    proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("host", request.url.netloc)
+    return f"{proto}://{host}"
+
+
+@app.get("/api/auth/google")
+def google_login(request: Request):
+    """Start sign-in: redirect the browser to Google's consent screen."""
+    if not _auth.auth_enabled():
+        raise HTTPException(503, "Sign-in is not configured on this instance")
+    return RedirectResponse(
+        _auth.google_login_url(_callback_base(request), _auth.make_state())
+    )
+
+
+@app.get("/api/auth/google/callback")
+async def google_callback(request: Request):
+    """Google returns here with ?code=... — exchange, upsert, mint JWT,
+    then redirect to the frontend with the token in the #fragment."""
+    code = request.query_params.get("code", "")
+    state = request.query_params.get("state", "")
+    if not code:
+        return RedirectResponse(f"{_auth.frontend_url()}/auth/callback#error=missing_code")
+    if state and not _auth.check_state(state):
+        return RedirectResponse(f"{_auth.frontend_url()}/auth/callback#error=bad_state")
+
+    profile = await _auth.exchange_code(code, _callback_base(request))
+    if not profile.get("email"):
+        return RedirectResponse(f"{_auth.frontend_url()}/auth/callback#error=no_email")
+
+    user_id = _auth.upsert_user(
+        DB_PATH, profile["sub"], profile["email"], profile["name"], profile["picture"]
+    )
+    token = _auth.create_token(user_id, profile["email"])
+    return RedirectResponse(f"{_auth.frontend_url()}/auth/callback#token={token}")
+
+
+@app.get("/api/auth/me")
+def auth_me(request: Request):
+    """Current session info (works whether auth is on or off)."""
+    if not _auth.auth_enabled():
+        return {"auth_enabled": False, "user": None}
+    header = request.headers.get("authorization", "")
+    if header.startswith("Bearer "):
+        try:
+            payload = _auth.verify_token(header[7:])
+            user = _auth.get_user(DB_PATH, int(payload["sub"]))
+            if user:
+                return {"auth_enabled": True, "user": user}
+        except (ValueError, KeyError, TypeError):
+            pass
+    return {"auth_enabled": True, "user": None}
+
+
+@app.post("/api/auth/logout")
+def auth_logout():
+    """Stateless JWTs: logout is client-side token discard."""
+    return {"ok": True}
 
 
 def _serve_frontend() -> HTMLResponse:

@@ -25,6 +25,17 @@ services:
       # already covered by the *.vercel.app regex)
       - key: ALLOWED_ORIGINS
         sync: false
+      # ---- Sign-in with Google (optional; Console is open without these)
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      # Where to send the user after Google login (your Vercel URL)
+      - key: FRONTEND_URL
+        sync: false
+      # Random string that signs session JWTs (set to persist sessions)
+      - key: AUTH_SECRET
+        sync: false
     # NOTE: free-tier services spin down after 15 min idle and SQLite
     # data resets on each deploy — the public demo is ephemeral by design.
     # For a persistent instance, upgrade the plan or run locally with a

@@ -207,6 +207,38 @@ The split deployment: **frontend on Vercel**, **backend on Render**.
 CORS is preconfigured: all `*.vercel.app` origins are accepted, plus anything
 listed in the backend's `ALLOWED_ORIGINS` env var (for custom domains).
 
+### Sign-in with Google (protects the Console)
+
+Works in every browser (Firefox, Chrome, Safari) — it's the standard
+"Continue with Google" flow. Auth activates **only** when configured;
+zero-config local runs stay open.
+
+1. **Google Cloud Console** → [console.cloud.google.com](https://console.cloud.google.com)
+   → create (or pick) a project
+2. **APIs & Services → OAuth consent screen** → External → fill app name
+   (`ApplyJin`) and your email → add yourself as a **test user** → save
+3. **APIs & Services → Credentials → Create Credentials → OAuth Client ID**
+   → *Web application*
+4. **Authorized redirect URIs** — add your backend callback exactly:
+   ```
+   https://applyjin.onrender.com/api/auth/google/callback
+   ```
+   (and `http://localhost:8000/api/auth/google/callback` for local testing)
+5. Copy the **Client ID** and **Client Secret**
+6. **On Render** (Environment tab) set:
+   | Variable | Value |
+   |---|---|
+   | `GOOGLE_CLIENT_ID` | `...apps.googleusercontent.com` |
+   | `GOOGLE_CLIENT_SECRET` | `...` |
+   | `FRONTEND_URL` | your Vercel URL, e.g. `https://applyjin.vercel.app` |
+   | `AUTH_SECRET` | any long random string (keeps sessions alive across deploys) |
+7. Redeploy — the Console now requires sign-in; the landing page stays public
+
+The flow: the Console redirects to Google → Google returns to the backend →
+the backend mints a week-long JWT and sends the browser to
+`/auth/callback#token=...` (URL fragment — never logged or leaked via
+referrers) → the SPA stores it and opens the Console.
+
 **Free-tier caveats:** the Render service sleeps after ~15 min idle (first
 request takes ~30s to wake) and its SQLite data resets on each deploy — the
 public deployment is an ephemeral demo. For day-to-day use with persistent

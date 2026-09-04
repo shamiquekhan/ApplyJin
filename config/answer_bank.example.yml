@@ -1,0 +1,25 @@
+# Pre-written answers to common screening questions (guide §9).
+# Copy to answer_bank.yml. The application agent uses these (with LLM
+# refinement when available) to fill screening question text fields.
+# NEVER include answers that misrepresent you — same rule as resumes.
+
+work_authorization:
+  answer: "Yes, authorized to work in India; open to remote roles across time zones."
+
+relocation:
+  answer: "Open to relocation for the right role; currently remote-based in India."
+
+start_date:
+  answer: "Can start within 2 weeks."
+
+salary_expectations:
+  answer: "Flexible — happy to discuss based on the role's scope and level."
+
+why_this_company:
+  answer: "The role's focus on production LLM systems matches my experience shipping 40+ ML/LLM systems end to end."
+
+remote_work:
+  answer: "Yes — I've worked remote-first across distributed teams for 2+ years."
+
+years_of_experience:
+  answer: "1+ years building and shipping ML/LLM systems (40+ deployed)."

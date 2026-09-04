@@ -1,0 +1,9 @@
+# Email triage config. Copy to email_config.yml and fill in.
+# Gmail: enable IMAP + create an App Password (Google Account > Security).
+# NEVER commit the real file — it's gitignored.
+
+imap_host: "imap.gmail.com"
+imap_user: "you@gmail.com"
+imap_password: "your-app-password"
+folders: ["INBOX"]
+days_lookback: 30

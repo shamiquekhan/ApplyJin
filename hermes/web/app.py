@@ -23,10 +23,27 @@ from hermes.web.store import WebStore
 
 app = FastAPI(title="Hermes Dashboard", version="0.6.0")
 
-# Vite dev server talks to the API cross-origin during development.
+# Cross-origin policy:
+#  - dev: the Vite server on :3000 (proxied — same-origin, but allow anyway)
+#  - prod: the Vercel frontend (any *.vercel.app preview + custom domains
+#    via env). Render backend + Vercel frontend = cross-origin by design.
+import os as _os
+
+_VERCEL_PREVIEW = r"https?://.*\.vercel\.app"
+_EXTRA_ORIGINS = [
+    o.strip()
+    for o in _os.environ.get("ALLOWED_ORIGINS", "").split(",")
+    if o.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origin_regex=_VERCEL_PREVIEW,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        *_EXTRA_ORIGINS,
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )

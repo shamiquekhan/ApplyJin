@@ -48,6 +48,7 @@ config/email_config.yml
 # Environment / secrets
 .env
 .env.*
+!.env.example
 
 # OS
 .DS_Store

@@ -1,0 +1,31 @@
+# Render blueprint — deploy the ApplyJin backend in one click.
+# Docs: https://render.com/docs/blueprints
+#
+# After deploy, set GEMINI_API_KEY in the Render dashboard (or below via
+# sync: false), and point the Vercel frontend at the service URL:
+#   VITE_API_URL=https://applyjin-api.onrender.com
+
+services:
+  - type: web
+    name: applyjin-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      # Free Gemini key — set in the dashboard, not in git
+      - key: GEMINI_API_KEY
+        sync: false
+      # Optional: comma-separated extra allowed CORS origins
+      # (your Vercel custom domain, e.g. https://applyjin.vercel.app is
+      # already covered by the *.vercel.app regex)
+      - key: ALLOWED_ORIGINS
+        sync: false
+    # NOTE: free-tier services spin down after 15 min idle and SQLite
+    # data resets on each deploy — the public demo is ephemeral by design.
+    # For a persistent instance, upgrade the plan or run locally with a
+    # Cloudflare tunnel.

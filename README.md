@@ -184,6 +184,35 @@ cd frontend && npm install && npm run dev   # → http://localhost:3000
 | `hermes dashboard` / `serve` | TUI / web dashboards |
 | `hermes export --id N` | Regenerate PDFs |
 
+## Deployment (free)
+
+The split deployment: **frontend on Vercel**, **backend on Render**.
+
+### Backend → Render (Docker)
+
+1. Push this repo to GitHub
+2. [render.com](https://render.com) → **New → Blueprint** → select the repo
+   (the included `render.yaml` configures everything) — or New → Docker Service manually
+3. Set the `GEMINI_API_KEY` env var in the dashboard
+4. Service goes live at `https://<name>.onrender.com` with `/health`,
+   the full REST API, and LaTeX PDF generation (texlive included in the image)
+
+### Frontend → Vercel
+
+1. [vercel.com](https://vercel.com) → **Add New → Project** → import the repo
+2. **Root Directory: `frontend`** (Vercel auto-detects Vite; `vercel.json` sets the SPA rewrites)
+3. Environment variable: `VITE_API_URL = https://<your-render-service>.onrender.com`
+4. Deploy → live at `https://<name>.vercel.app` with the Console at `/dashboard`
+
+CORS is preconfigured: all `*.vercel.app` origins are accepted, plus anything
+listed in the backend's `ALLOWED_ORIGINS` env var (for custom domains).
+
+**Free-tier caveats:** the Render service sleeps after ~15 min idle (first
+request takes ~30s to wake) and its SQLite data resets on each deploy — the
+public deployment is an ephemeral demo. For day-to-day use with persistent
+data, run locally and expose it with a free Cloudflare tunnel
+(`cloudflared tunnel --url http://localhost:8000`).
+
 ## Testing
 
 ```bash

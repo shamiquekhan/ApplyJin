@@ -1,4 +1,11 @@
-/** Full API client for the ApplyJin backend (Hermes FastAPI). */
+/** Full API client for the ApplyJin backend (Hermes FastAPI).
+ *
+ * API base resolution:
+ *  - dev/preview (npm run dev): "" -> Vite proxies /api to localhost:8000
+ *  - production (Vercel): VITE_API_URL env var -> absolute Render URL
+ */
+
+const API_BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
 export interface PublicStats {
   applications: number;
@@ -90,67 +97,71 @@ function form(data: Record<string, string | Blob>): FormData {
 
 // -------- public (landing)
 export const fetchStats = () =>
-  fetch("/api/public/stats").then((r) => handle<PublicStats>(r));
+  fetch(`${API_BASE}/api/public/stats`).then((r) => handle<PublicStats>(r));
 
 export async function joinWaitlist(email: string): Promise<{ ok: boolean; message: string; duplicate: boolean }> {
-  const r = await fetch("/api/public/waitlist", { method: "POST", body: form({ email, source: "landing" }) });
+  const r = await fetch(`${API_BASE}/api/public/waitlist`, { method: "POST", body: form({ email, source: "landing" }) });
   return handle(r);
 }
 
 // -------- resumes
 export const listResumes = () =>
-  fetch("/api/resumes").then((r) => handle<ResumeSummary[]>(r));
+  fetch(`${API_BASE}/api/resumes`).then((r) => handle<ResumeSummary[]>(r));
 
 export const getResume = (id: number) =>
-  fetch(`/api/resumes/${id}`).then((r) => handle<ResumeDetail>(r));
+  fetch(`${API_BASE}/api/resumes/${id}`).then((r) => handle<ResumeDetail>(r));
 
 export const uploadResume = (file: File, name: string) => {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("name", name || file.name);
-  return fetch("/api/resumes/upload", { method: "POST", body: fd })
+  return fetch(`${API_BASE}/api/resumes/upload`, { method: "POST", body: fd })
     .then((r) => handle<{ id: number; bullets: number }>(r));
 };
 
 export const createResume = (name: string, content: string) =>
-  fetch("/api/resumes/create", { method: "POST", body: form({ name, content }) })
+  fetch(`${API_BASE}/api/resumes/create`, { method: "POST", body: form({ name, content }) })
     .then((r) => handle<{ id: number }>(r));
 
 // -------- job descriptions
 export const listJDs = () =>
-  fetch("/api/job-descriptions").then((r) => handle<JDSummary[]>(r));
+  fetch(`${API_BASE}/api/job-descriptions`).then((r) => handle<JDSummary[]>(r));
 
 export const addJD = (title: string, company: string, content: string) =>
-  fetch("/api/job-descriptions", { method: "POST", body: form({ title, company, content }) })
+  fetch(`${API_BASE}/api/job-descriptions`, { method: "POST", body: form({ title, company, content }) })
     .then((r) => handle<{ id: number }>(r));
 
 export const extractKeywords = (jdId: number) =>
-  fetch(`/api/job-descriptions/${jdId}/extract-keywords`, { method: "POST" })
+  fetch(`${API_BASE}/api/job-descriptions/${jdId}/extract-keywords`, { method: "POST" })
     .then((r) => handle<KeywordBuckets>(r));
 
 // -------- applications
 export const createApplication = (resumeId: number, jdId: number) =>
-  fetch("/api/applications", { method: "POST", body: form({ resume_id: String(resumeId), jd_id: String(jdId) }) })
+  fetch(`${API_BASE}/api/applications`, { method: "POST", body: form({ resume_id: String(resumeId), jd_id: String(jdId) }) })
     .then((r) => handle<{ id: number; scores_before: Scores }>(r));
 
 export const tailorResume = (appId: number, keywords: string[]) =>
-  fetch(`/api/applications/${appId}/tailor`, {
+  fetch(`${API_BASE}/api/applications/${appId}/tailor`, {
     method: "POST",
     body: form({ selected_keywords: JSON.stringify(keywords) }),
   }).then((r) => handle<TailorResult>(r));
 
 export const generateCoverLetter = (appId: number) =>
-  fetch(`/api/applications/${appId}/cover-letter`, { method: "POST" })
+  fetch(`${API_BASE}/api/applications/${appId}/cover-letter`, { method: "POST" })
     .then((r) => handle<{ cover_letter_md: string }>(r));
 
 export const listApplications = () =>
-  fetch("/api/applications").then((r) => handle<ApplicationRow[]>(r));
+  fetch(`${API_BASE}/api/applications`).then((r) => handle<ApplicationRow[]>(r));
 
 export const downloadUrl = {
-  resume: (id: number) => `/api/applications/${id}/download-resume`,
-  cover: (id: number) => `/api/applications/${id}/download-cover-letter`,
-  latex: (id: number) => `/api/applications/${id}/download-resume-latex`,
+  resume: (id: number) => `${API_BASE}/api/applications/${id}/download-resume`,
+  cover: (id: number) => `${API_BASE}/api/applications/${id}/download-cover-letter`,
+  latex: (id: number) => `${API_BASE}/api/applications/${id}/download-resume-latex`,
 };
+
+/** DELETE request against the configured API base. */
+export const del = (path: string) =>
+  fetch(`${API_BASE}/api/${path}`, { method: "DELETE" });
 
 // -------- master CV database
 export interface MasterProfile {
@@ -176,29 +187,29 @@ export interface MasterStats {
 }
 
 export const masterProfile = () =>
-  fetch("/api/master/profile").then((r) => handle<MasterProfile>(r));
+  fetch(`${API_BASE}/api/master/profile`).then((r) => handle<MasterProfile>(r));
 
 export const updateMasterProfile = (profile: Partial<MasterProfile>) =>
-  fetch("/api/master/profile", {
+  fetch(`${API_BASE}/api/master/profile`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(profile),
   }).then((r) => handle<MasterProfile>(r));
 
 export const masterStats = () =>
-  fetch("/api/master/stats").then((r) => handle<MasterStats>(r));
+  fetch(`${API_BASE}/api/master/stats`).then((r) => handle<MasterStats>(r));
 
 export const listMasterExperiences = () =>
-  fetch("/api/master/experiences").then((r) => handle<MasterExperience[]>(r));
+  fetch(`${API_BASE}/api/master/experiences`).then((r) => handle<MasterExperience[]>(r));
 
 export const listMasterProjects = () =>
-  fetch("/api/master/projects").then((r) => handle<MasterProject[]>(r));
+  fetch(`${API_BASE}/api/master/projects`).then((r) => handle<MasterProject[]>(r));
 
 export const listMasterSkills = () =>
-  fetch("/api/master/skills").then((r) => handle<Record<string, string[]>>(r));
+  fetch(`${API_BASE}/api/master/skills`).then((r) => handle<Record<string, string[]>>(r));
 
 export const importMasterFromResume = (resumeId: number) =>
-  fetch("/api/master/import-resume", {
+  fetch(`${API_BASE}/api/master/import-resume`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ resume_id: resumeId }),
@@ -216,13 +227,13 @@ export interface TailorResultV3 extends TailorResult {
 }
 
 export const tailorResumeV3 = (appId: number, keywords: string[]) =>
-  fetch(`/api/applications/${appId}/tailor`, {
+  fetch(`${API_BASE}/api/applications/${appId}/tailor`, {
     method: "POST",
     body: form({ selected_keywords: JSON.stringify(keywords) }),
   }).then((r) => handle<TailorResultV3>(r));
 
 export const emailTemplate = (appId: number, templateType: string) =>
-  fetch(`/api/applications/${appId}/email-template`, {
+  fetch(`${API_BASE}/api/applications/${appId}/email-template`, {
     method: "POST",
     body: form({ template_type: templateType }),
   }).then((r) => handle<{ email_md: string; hiring_manager?: string; emails: string[] }>(r));

@@ -191,6 +191,98 @@ def dashboard_page() -> HTMLResponse:
     raise HTTPException(404, "dashboard not found")
 
 
+# --------------------------------------------------------- LLM settings
+
+import yaml as _yaml  # noqa: E402
+
+_LLM_CONFIG_PATH = Path("config/llm_config.yml")
+
+
+def _read_llm_config() -> dict:
+    """Read the current LLM config, returning a safe dict with defaults."""
+    if _LLM_CONFIG_PATH.exists():
+        try:
+            return _yaml.safe_load(_LLM_CONFIG_PATH.read_text()) or {}
+        except Exception:
+            pass
+    return {"chain": [], "generation": {"temperature": 0.3, "max_tokens": 4096, "timeout_seconds": 60}}
+
+
+def _write_llm_config(cfg: dict) -> None:
+    """Persist LLM config to the YAML file."""
+    _LLM_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _LLM_CONFIG_PATH.write_text(_yaml.dump(cfg, default_flow_style=False, sort_keys=False))
+
+
+@app.get("/api/settings/llm")
+def get_llm_settings() -> JSONResponse:
+    """Return the current LLM provider config (keys redacted)."""
+    cfg = _read_llm_config()
+    # Redact API keys before sending to the frontend
+    safe_chain = []
+    for entry in cfg.get("chain", []):
+        e = dict(entry)
+        if e.get("api_key"):
+            e["api_key_set"] = True
+            e["api_key"] = ""  # never send real keys to the browser
+        else:
+            e["api_key_set"] = False
+        safe_chain.append(e)
+    return JSONResponse({"chain": safe_chain, "generation": cfg.get("generation", {})})
+
+
+@app.post("/api/settings/llm")
+async def update_llm_settings(payload: dict) -> JSONResponse:
+    """Update LLM provider config. Pass api_key to set, empty string to unset."""
+    cfg = _read_llm_config()
+    chain = cfg.get("chain", [])
+
+    updates = payload.get("chain", [])
+    for update in updates:
+        provider = update.get("provider", "")
+        model = update.get("model", "")
+        api_key = update.get("api_key", "")
+        api_base = update.get("api_base", "")
+
+        # Find existing entry or append new one
+        found = False
+        for entry in chain:
+            if entry.get("provider") == provider and entry.get("model") == model:
+                if api_key:
+                    entry["api_key"] = api_key
+                elif api_key == "":
+                    entry["api_key"] = ""
+                if api_base:
+                    entry["api_base"] = api_base
+                found = True
+                break
+        if not found and model:
+            new_entry = {"provider": provider, "model": model}
+            if api_key:
+                new_entry["api_key"] = api_key
+            if api_base:
+                new_entry["api_base"] = api_base
+            chain.append(new_entry)
+
+    # Remove entries with empty keys (user wants to unset)
+    chain = [e for e in chain if e.get("api_key") or e.get("provider") == "ollama"]
+
+    cfg["chain"] = chain
+    _write_llm_config(cfg)
+
+    # Return redacted config
+    safe_chain = []
+    for entry in chain:
+        e = dict(entry)
+        if e.get("api_key"):
+            e["api_key_set"] = True
+            e["api_key"] = ""
+        else:
+            e["api_key_set"] = False
+        safe_chain.append(e)
+    return JSONResponse({"ok": True, "chain": safe_chain})
+
+
 # ---------------------------------------------------------- master CV DB
 
 

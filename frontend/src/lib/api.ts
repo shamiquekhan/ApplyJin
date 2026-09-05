@@ -238,3 +238,28 @@ export const emailTemplate = (appId: number, templateType: string) =>
     method: "POST",
     body: form({ template_type: templateType }),
   }).then((r) => handle<{ email_md: string; hiring_manager?: string; emails: string[] }>(r));
+
+// -------- LLM settings
+
+export interface LLMProvider {
+  provider: string;
+  model: string;
+  api_key_set?: boolean;
+  api_base?: string;
+}
+
+export interface LLMSettings {
+  chain: LLMProvider[];
+  generation: Record<string, number>;
+}
+
+export const getLLMSettings = () =>
+  fetch(`${API_BASE}/api/settings/llm`, { headers: authHeader() }).then((r) => handle<LLMSettings>(r));
+
+export const updateLLMSettings = (chain: { provider: string; model: string; api_key: string; api_base?: string }[]) =>
+  fetch(`${API_BASE}/api/settings/llm`, {
+    ...authHeader(),
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chain }),
+  }).then((r) => handle<{ ok: boolean; chain: LLMProvider[] }>(r));

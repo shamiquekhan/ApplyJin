@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, Database, Download, FileText, Loader2, Mail, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Database, Download, FileText, Loader2, Mail, Settings, Sparkles, Trash2 } from "lucide-react";
 import * as api from "../lib/api";
 import { markdownToHtml } from "../lib/markdown";
 import type { ApplicationRow, KeywordBuckets, ResumeSummary, JDSummary, Scores, TailorResult, MasterStats, MasterExperience, MasterProject } from "../lib/api";
@@ -667,6 +667,120 @@ function ApplicationsPanel() {
   );
 }
 
+/* ---------- panel: Settings ---------- */
+
+const PROVIDERS = [
+  { provider: "gemini", model: "gemini/gemini-3.6-flash", label: "Gemini 3.6 Flash", placeholder: "AIza..." },
+  { provider: "groq", model: "groq/llama-3.3-70b-versatile", label: "Groq (Llama 3.3 70B)", placeholder: "gsk_..." },
+  { provider: "ollama", model: "ollama/llama3.1", label: "Ollama (local, no key)", placeholder: "" },
+];
+
+function SettingsPanel({ toast }: { toast: (t: string, error?: boolean) => void }) {
+  const [chain, setChain] = useState<{ provider: string; model: string; api_key: string; api_key_set?: boolean; api_base?: string }[]>([]);
+  const [keys, setKeys] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    api.getLLMSettings().then((s) => {
+      setChain(s.chain.map((c) => ({ ...c, api_key: "" })));
+      setLoaded(true);
+    }).catch(() => setLoaded(true));
+  }, []);
+
+  function setKey(model: string, value: string) {
+    setKeys((prev) => ({ ...prev, [model]: value }));
+  }
+
+  function isConfigured(model: string) {
+    return chain.some((c) => c.model === model && c.api_key_set);
+  }
+
+  async function save() {
+    setBusy(true);
+    try {
+      const updates: { provider: string; model: string; api_key: string; api_base?: string }[] = [];
+      for (const p of PROVIDERS) {
+        const key = keys[p.model] || "";
+        if (key || isConfigured(p.model)) {
+          updates.push({ provider: p.provider, model: p.model, api_key: key });
+        }
+      }
+      const result = await api.updateLLMSettings(updates);
+      const cleared = result.chain.map((c) => ({ ...c, api_key: "" }));
+      setChain(cleared);
+      setKeys({});
+      toast("LLM config saved — the agent will use your new keys on the next tailoring run");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Save failed", true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className={cardCls + " p-6"}>
+        <div className="flex items-center gap-3 mb-4">
+          <Settings className="w-5 h-5 text-primary" />
+          <h2 className="text-lg font-medium" style={{ color: "#E1E0CC" }}>LLM API keys</h2>
+        </div>
+        <p className="text-primary/50 text-xs mb-6 max-w-2xl">
+          Paste your API key below and hit Save. The agent needs at least one provider
+          to tailor resumes with AI. If none are configured, the agent falls back
+          to heuristic mode — it still works, just with less finesse.
+        </p>
+
+        <div className="space-y-4">
+          {PROVIDERS.map((p) => {
+            const configured = isConfigured(p.model);
+            return (
+              <div key={p.model} className="border border-primary/10 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: "#E1E0CC" }}>{p.label}</p>
+                    <p className="text-[10px] text-primary/40 mt-0.5">{p.model}</p>
+                  </div>
+                  {configured && (
+                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-primary/10 text-primary/80">
+                      Key saved
+                    </span>
+                  )}
+                </div>
+                {p.placeholder ? (
+                  <input
+                    type="password"
+                    className={inputCls}
+                    placeholder={configured ? "•••••••• (leave blank to keep current)" : p.placeholder}
+                    value={keys[p.model] || ""}
+                    onChange={(e) => setKey(p.model, e.target.value)}
+                  />
+                ) : (
+                  <p className="text-xs text-primary/40 italic">No key needed — runs locally via Ollama</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <button
+          onClick={save}
+          disabled={busy || Object.values(keys).every((v) => !v)}
+          className="mt-6 bg-primary text-black rounded-full px-6 py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+        >
+          {busy && <Loader2 className="w-4 h-4 animate-spin" />}
+          Save LLM config
+        </button>
+
+        <p className="text-[10px] text-primary/30 mt-3">
+          Keys are stored in <code className="bg-primary/10 px-1.5 py-0.5 rounded">config/llm_config.yml</code> on the
+          server. They are never sent to the browser except when you type them in this form.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- console shell ---------- */
 
 const TABS = [
@@ -675,6 +789,7 @@ const TABS = [
   { id: "jds", label: "Job descriptions" },
   { id: "tailor", label: "Tailor & score" },
   { id: "applications", label: "Applications" },
+  { id: "settings", label: "Settings" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -764,6 +879,7 @@ export function Console() {
           {tab === "jds" && <JDsPanel toast={toast} />}
           {tab === "tailor" && <TailorPanel toast={toast} />}
           {tab === "applications" && <ApplicationsPanel />}
+          {tab === "settings" && <SettingsPanel toast={toast} />}
         </motion.div>
 
         <p className="text-center text-primary/30 text-xs mt-12 flex items-center justify-center gap-2">

@@ -58,3 +58,4 @@ Thumbs.db
 /.agents/
 /.claude/
 /.cursor/
+data/auth_secret

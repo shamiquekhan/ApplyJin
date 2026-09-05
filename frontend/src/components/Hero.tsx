@@ -36,22 +36,25 @@ export function Hero() {
             >
               ApplyJin
             </a>
-            {NAV_ITEMS.map((item) => (
-              <a
-                key={item}
-                href={
-                  item === "Dashboard"
-                    ? "/dashboard"
-                    : `#${item.toLowerCase().replace(/\s+/g, "-")}`
-                }
-                className="text-[10px] sm:text-xs md:text-sm transition-colors shrink-0 min-h-[24px] flex items-center"
-                style={{ color: "rgba(225, 224, 204, 0.8)" }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = "#E1E0CC")}
-                onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(225, 224, 204, 0.8)")}
-              >
-                {item}
-              </a>
-            ))}
+            {NAV_ITEMS.map((item) => {
+              const href = item === "Dashboard"
+                ? "/dashboard"
+                : item === "Inquiries"
+                  ? "mailto:shamiquekhan18@gmail.com"
+                  : `#${item.toLowerCase().replace(/\s+/g, "-")}`;
+              return (
+                <a
+                  key={item}
+                  href={href}
+                  className="text-[10px] sm:text-xs md:text-sm transition-colors shrink-0 min-h-[24px] flex items-center"
+                  style={{ color: "rgba(225, 224, 204, 0.8)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "#E1E0CC")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(225, 224, 204, 0.8)")}
+                >
+                  {item}
+                </a>
+              );
+            })}
           </div>
         </nav>
 

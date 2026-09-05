@@ -1,10 +1,10 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Mail } from "lucide-react";
 import { WordsPullUpMultiStyle } from "./WordsPullUp";
 
 /**
  * Inquiries — the close. The product is live, so this is a direct
- * invitation, not a waitlist.
+ * invitation to get in touch.
  */
 export function Waitlist() {
   const reduce = useReducedMotion();
@@ -26,17 +26,30 @@ export function Waitlist() {
           keep your work yours.
         </p>
 
-        <motion.a
-          href="/dashboard"
-          className="mt-8 md:mt-10 mx-auto w-fit flex items-center gap-2 bg-primary text-black rounded-full px-6 py-3 text-sm sm:text-base font-medium hover:opacity-90 transition-opacity"
-          initial={reduce ? undefined : { y: 16, opacity: 0 }}
-          whileInView={reduce ? undefined : { y: 0, opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.7, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        >
-          Open the Console
-          <ArrowUpRight className="w-4 h-4" />
-        </motion.a>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-8 md:mt-10">
+          <motion.a
+            href="/dashboard"
+            className="w-fit flex items-center gap-2 bg-primary text-black rounded-full px-6 py-3 text-sm sm:text-base font-medium hover:opacity-90 transition-opacity"
+            initial={reduce ? undefined : { y: 16, opacity: 0 }}
+            whileInView={reduce ? undefined : { y: 0, opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.7, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          >
+            Open the Console
+            <ArrowUpRight className="w-4 h-4" />
+          </motion.a>
+          <motion.a
+            href="mailto:shamiquekhan18@gmail.com"
+            className="w-fit flex items-center gap-2 border border-primary/30 text-primary rounded-full px-6 py-3 text-sm sm:text-base hover:bg-primary/10 transition-colors"
+            initial={reduce ? undefined : { y: 16, opacity: 0 }}
+            whileInView={reduce ? undefined : { y: 0, opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.7, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <Mail className="w-4 h-4" />
+            Get in touch
+          </motion.a>
+        </div>
       </div>
     </section>
   );

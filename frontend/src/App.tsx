@@ -8,6 +8,7 @@ import { Footer } from "./components/Footer";
 import { Console } from "./components/Console";
 import { LoginScreen } from "./components/LoginScreen";
 import { AuthCallback } from "./components/AuthCallback";
+import { FeaturesPage } from "./components/FeaturesPage";
 
 export default function App() {
   const route = useRoute();
@@ -15,6 +16,7 @@ export default function App() {
   if (route.startsWith("/auth/callback")) return <AuthCallback />;
   if (route.startsWith("/login")) return <LoginScreen />;
   if (route.startsWith("/dashboard")) return <Console />;
+  if (route.startsWith("/features")) return <FeaturesPage />;
 
   return (
     <main className="bg-black min-h-screen">

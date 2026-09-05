@@ -1,35 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowUpRight } from "lucide-react";
-
-const COLUMNS = [
-  {
-    heading: "Product",
-    links: [
-      { label: "How it works", href: "#how-it-works" },
-      { label: "Dashboard", href: "/dashboard" },
-      { label: "Learning loop", href: "#how-it-works" },
-      { label: "Console", href: "/dashboard" },
-    ],
-  },
-  {
-    heading: "Resources",
-    links: [
-      { label: "Documentation", href: "#how-it-works" },
-      { label: "Guardrails", href: "#how-it-works" },
-      { label: "API reference", href: "/docs" },
-      { label: "Changelog", href: "#how-it-works" },
-    ],
-  },
-  {
-    heading: "Company",
-    links: [
-      { label: "About", href: "#how-it-works" },
-      { label: "Careers", href: "#how-it-works" },
-      { label: "Privacy", href: "#how-it-works" },
-      { label: "Terms", href: "#how-it-works" },
-    ],
-  },
-];
+import { ArrowUpRight, Mail } from "lucide-react";
 
 export function Footer() {
   return (
@@ -53,7 +23,7 @@ export function Footer() {
               job application agent that never fabricates and never spams.
             </p>
             <a
-              href="#inquiries"
+              href="/dashboard"
               className="group inline-flex w-fit items-center gap-2 text-primary text-sm border border-primary/30 rounded-full px-5 py-2.5 hover:bg-primary hover:text-black transition-colors"
             >
               Open the Console
@@ -61,35 +31,51 @@ export function Footer() {
             </a>
           </div>
 
-          {/* Link columns */}
-          {COLUMNS.map((col) => (
-            <div key={col.heading} className="col-span-1 sm:col-span-4 lg:col-span-2 min-w-0">
-              <p className="text-[10px] sm:text-xs text-primary/50 uppercase tracking-widest mb-4">
-                {col.heading}
-              </p>
-              <ul className="space-y-3">
-                {col.links.map((link) => (
-                  <li key={link.label}>
-                    <a
-                      href={link.href}
-                      className="text-sm transition-colors break-words inline-block py-1"
-                      style={{ color: "rgba(225, 224, 204, 0.8)" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.color = "#E1E0CC")}
-                      onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(225, 224, 204, 0.8)")}
-                    >
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          {/* Product links */}
+          <div className="col-span-1 sm:col-span-4 lg:col-span-2 min-w-0">
+            <p className="text-[10px] sm:text-xs text-primary/50 uppercase tracking-widest mb-4">
+              Product
+            </p>
+            <ul className="space-y-3">
+              <li><a href="#how-it-works" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>How it works</a></li>
+              <li><a href="#learning-loop" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>Learning loop</a></li>
+              <li><a href="/dashboard" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>Console</a></li>
+              <li><a href="#features" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>Features</a></li>
+            </ul>
+          </div>
+
+          {/* Resources */}
+          <div className="col-span-1 sm:col-span-4 lg:col-span-2 min-w-0">
+            <p className="text-[10px] sm:text-xs text-primary/50 uppercase tracking-widest mb-4">
+              Resources
+            </p>
+            <ul className="space-y-3">
+              <li><a href="#how-it-works" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>Guardrails</a></li>
+              <li><a href="/docs" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>API reference</a></li>
+              <li><a href="https://github.com/shamiquekhan/ApplyJin" target="_blank" rel="noopener noreferrer" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>GitHub</a></li>
+            </ul>
+          </div>
+
+          {/* Contact */}
+          <div className="col-span-1 sm:col-span-4 lg:col-span-2 min-w-0">
+            <p className="text-[10px] sm:text-xs text-primary/50 uppercase tracking-widest mb-4">
+              Contact
+            </p>
+            <ul className="space-y-3">
+              <li><a href="mailto:shamiquekhan18@gmail.com" className="text-sm transition-colors break-words inline-flex items-center gap-1.5 py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}><Mail className="w-3.5 h-3.5" /> Email us</a></li>
+              <li><a href="https://github.com/shamiquekhan/ApplyJin" target="_blank" rel="noopener noreferrer" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>Report an issue</a></li>
+              <li><a href="https://github.com/shamiquekhan" target="_blank" rel="noopener noreferrer" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>Shamique on GitHub</a></li>
+            </ul>
+          </div>
         </div>
 
         {/* Bottom bar */}
         <div className="mt-12 md:mt-16 pt-6 border-t border-primary/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <p className="text-[10px] sm:text-xs text-primary/50">
-            © 2026 ApplyJin. All rights reserved.
+            &copy; 2026 ApplyJin. All rights reserved. Made by{" "}
+            <a href="https://github.com/shamiquekhan" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors underline underline-offset-2">
+              Shamique Khan
+            </a>
           </p>
           <p className="text-[10px] sm:text-xs text-primary/50">
             Built with free tools — Gemini, LangGraph, Playwright, LaTeX.

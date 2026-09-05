@@ -339,3 +339,46 @@ export const generateLinkedIn = () =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({}),
   }).then((r) => handle<{ headline: string; about: string }>(r));
+
+// -------- Phase 7: visa + salary
+
+export interface VisaSponsorship {
+  sponsorship: "yes" | "no" | "likely_yes" | "likely_no" | "unknown";
+  confidence: number;
+  evidence: string[];
+  method: string;
+  cached: boolean;
+  h1b_count: number | null;
+}
+
+export const getVisaSponsorship = (company: string) =>
+  fetch(`${API_BASE}/api/visa-sponsorship/${encodeURIComponent(company)}`, { headers: authHeader() })
+    .then((r) => handle<VisaSponsorship>(r));
+
+export const addVisaSponsor = (employer: string, sponsorship: string, evidence: string = "") =>
+  fetch(`${API_BASE}/api/visa-sponsorship`, {
+    ...authHeader(),
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ employer, sponsorship, evidence }),
+  }).then((r) => handle<{ ok: boolean }>(r));
+
+export interface SalaryInsights {
+  min: number;
+  max: number;
+  median: number;
+  source: string;
+  sample_size?: number;
+  level?: string;
+  location_multiplier?: number;
+  bls_base?: number;
+  cached: boolean;
+}
+
+export const getSalaryInsights = (title: string, location: string = "", company: string = "") => {
+  const params = new URLSearchParams({ title });
+  if (location) params.set("location", location);
+  if (company) params.set("company", company);
+  return fetch(`${API_BASE}/api/salary-insights?${params}`, { headers: authHeader() })
+    .then((r) => handle<SalaryInsights>(r));
+};

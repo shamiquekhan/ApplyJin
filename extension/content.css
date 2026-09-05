@@ -1,0 +1,10 @@
+/* ApplyJin extension — injected styles for autofill visual feedback */
+
+@keyframes applyjin-flash {
+  0% { box-shadow: 0 0 0 2px rgba(225, 224, 204, 0.6); }
+  100% { box-shadow: 0 0 0 2px transparent; }
+}
+
+.applyjin-filled {
+  animation: applyjin-flash 1.2s ease-out;
+}

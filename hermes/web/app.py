@@ -1273,3 +1273,37 @@ Return JSON with keys: "headline" (string, max 220 chars) and "about" (string, m
         )
 
     return JSONResponse({"headline": headline, "about": about})
+
+
+# --------------------------------------------------- Phase 7: visa + salary
+
+
+@app.get("/api/visa-sponsorship/{company}")
+def visa_sponsorship(company: str) -> JSONResponse:
+    """Look up visa sponsorship history for a company."""
+    from hermes.utils.visa_sponsorship import lookup_sponsorship
+    result = lookup_sponsorship(company)
+    return JSONResponse(result)
+
+
+@app.post("/api/visa-sponsorship")
+async def add_visa_sponsor(payload: dict) -> JSONResponse:
+    """Manually mark an employer as a sponsor."""
+    from hermes.utils.visa_sponsorship import add_sponsor
+    employer = payload.get("employer", "")
+    sponsorship = payload.get("sponsorship", "yes")
+    evidence = payload.get("evidence", "")
+    if not employer:
+        raise HTTPException(400, "employer is required")
+    add_sponsor(employer, sponsorship, evidence)
+    return JSONResponse({"ok": True})
+
+
+@app.get("/api/salary-insights")
+def salary_insights(title: str = "", location: str = "", company: str = "") -> JSONResponse:
+    """Get salary insights for a job title + location."""
+    from hermes.utils.salary_insights import get_salary_insights
+    if not title:
+        raise HTTPException(400, "title is required")
+    result = get_salary_insights(title, location, company)
+    return JSONResponse(result)

@@ -8,6 +8,7 @@ import { navigate } from "../lib/router";
 import { fetchMe, logout } from "../lib/session";
 import { CopilotChat } from "./CopilotChat";
 import { KanbanBoard } from "./KanbanBoard";
+import { ResearchPanel } from "./ResearchPanel";
 
 /* ---------- shared atoms (ApplyJin design system) ---------- */
 
@@ -958,6 +959,7 @@ const TABS = [
   { id: "applications", label: "Applications" },
   { id: "pipeline", label: "Pipeline" },
   { id: "linkedin", label: "LinkedIn" },
+  { id: "research", label: "Research" },
   { id: "settings", label: "Settings" },
 ] as const;
 
@@ -1050,6 +1052,7 @@ export function Console() {
           {tab === "applications" && <ApplicationsPanel />}
           {tab === "pipeline" && <KanbanBoard toast={toast} />}
           {tab === "linkedin" && <LinkedInPanel toast={toast} />}
+          {tab === "research" && <ResearchPanel toast={toast} />}
           {tab === "settings" && <SettingsPanel toast={toast} />}
         </motion.div>
 

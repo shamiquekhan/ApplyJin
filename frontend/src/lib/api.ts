@@ -302,3 +302,40 @@ export const copilotChat = (message: string, applicationId?: number) =>
 export const getCopilotHistory = (appId: number) =>
   fetch(`${API_BASE}/api/copilot/history/${appId}`, { headers: authHeader() })
     .then((r) => handle<CopilotMessage[]>(r));
+
+// -------- pipeline (Kanban)
+
+export type PipelineStatus = "saved" | "tailored" | "applied" | "interviewing" | "offer" | "rejected" | "ghosted";
+
+export interface PipelineCard {
+  id: number;
+  pipeline_status: string;
+  ats_after: number | null;
+  created_at: string;
+  resume_name: string;
+  jd_title: string;
+  jd_company: string;
+  fit_breakdown?: FitBreakdown | null;
+}
+
+export const getPipeline = () =>
+  fetch(`${API_BASE}/api/pipeline`, { headers: authHeader() })
+    .then((r) => handle<Record<PipelineStatus, PipelineCard[]>>(r));
+
+export const updatePipelineStatus = (appId: number, status: PipelineStatus) =>
+  fetch(`${API_BASE}/api/pipeline/${appId}/status`, {
+    ...authHeader(),
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  }).then((r) => handle<{ ok: boolean; status: string }>(r));
+
+// -------- LinkedIn generator
+
+export const generateLinkedIn = () =>
+  fetch(`${API_BASE}/api/linkedin/generate`, {
+    ...authHeader(),
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  }).then((r) => handle<{ headline: string; about: string }>(r));

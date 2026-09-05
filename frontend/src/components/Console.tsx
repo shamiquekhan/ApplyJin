@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, Bot, Check, Database, Download, FileText, Loader2, Mail, Settings, Shield, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Check, Database, Download, FileText, Loader2, Link, Mail, Settings, Shield, Sparkles, Trash2 } from "lucide-react";
 import * as api from "../lib/api";
 import { markdownToHtml } from "../lib/markdown";
 import type { ApplicationRow, KeywordBuckets, ResumeSummary, JDSummary, Scores, TailorResult, MasterStats, MasterExperience, MasterProject } from "../lib/api";
 import { navigate } from "../lib/router";
 import { fetchMe, logout } from "../lib/session";
 import { CopilotChat } from "./CopilotChat";
+import { KanbanBoard } from "./KanbanBoard";
 
 /* ---------- shared atoms (ApplyJin design system) ---------- */
 
@@ -877,6 +878,76 @@ function SettingsPanel({ toast }: { toast: (t: string, error?: boolean) => void 
   );
 }
 
+/* ---------- panel: LinkedIn generator ---------- */
+
+function LinkedInPanel({ toast }: { toast: (t: string, error?: boolean) => void }) {
+  const [headline, setHeadline] = useState("");
+  const [about, setAbout] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [generated, setGenerated] = useState(false);
+
+  async function generate() {
+    setBusy(true);
+    try {
+      const res = await api.generateLinkedIn();
+      setHeadline(res.headline);
+      setAbout(res.about);
+      setGenerated(true);
+      toast("LinkedIn copy generated from your Master CV");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Generation failed", true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function copy(text: string) {
+    navigator.clipboard.writeText(text);
+    toast("Copied to clipboard");
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className={cardCls + " p-6"}>
+        <div className="flex items-center gap-3 mb-4">
+          <Link className="w-5 h-5 text-primary" />
+          <h2 className="text-lg font-medium" style={{ color: "#E1E0CC" }}>LinkedIn profile copy</h2>
+        </div>
+        <p className="text-primary/50 text-xs mb-6 max-w-2xl">
+          Generate a keyword-rich headline and an engaging About section from your
+          Master CV database. Edit freely after generation.
+        </p>
+        <button onClick={generate} disabled={busy}
+          className="bg-primary text-black rounded-full px-6 py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
+          {busy && <Loader2 className="w-4 h-4 animate-spin" />}
+          Generate from Master CV
+        </button>
+      </div>
+
+      {generated && (
+        <>
+          <div className={cardCls + " p-6"}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-primary/80 uppercase tracking-widest">Headline</h3>
+              <button onClick={() => copy(headline)} className="text-[10px] text-primary/50 hover:text-primary">Copy</button>
+            </div>
+            <p className="text-sm leading-relaxed" style={{ color: "#E1E0CC" }}>{headline}</p>
+            <p className="text-[10px] text-primary/30 mt-2">{headline.length}/220 characters</p>
+          </div>
+          <div className={cardCls + " p-6"}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-primary/80 uppercase tracking-widest">About</h3>
+              <button onClick={() => copy(about)} className="text-[10px] text-primary/50 hover:text-primary">Copy</button>
+            </div>
+            <div className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: "#E1E0CC" }}>{about}</div>
+            <p className="text-[10px] text-primary/30 mt-2">{about.length}/2600 characters</p>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ---------- console shell ---------- */
 
 const TABS = [
@@ -885,6 +956,8 @@ const TABS = [
   { id: "jds", label: "Job descriptions" },
   { id: "tailor", label: "Tailor & score" },
   { id: "applications", label: "Applications" },
+  { id: "pipeline", label: "Pipeline" },
+  { id: "linkedin", label: "LinkedIn" },
   { id: "settings", label: "Settings" },
 ] as const;
 
@@ -975,6 +1048,8 @@ export function Console() {
           {tab === "jds" && <JDsPanel toast={toast} />}
           {tab === "tailor" && <TailorPanel toast={toast} />}
           {tab === "applications" && <ApplicationsPanel />}
+          {tab === "pipeline" && <KanbanBoard toast={toast} />}
+          {tab === "linkedin" && <LinkedInPanel toast={toast} />}
           {tab === "settings" && <SettingsPanel toast={toast} />}
         </motion.div>
 

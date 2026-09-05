@@ -1171,3 +1171,105 @@ def copilot_history(app_id: int) -> JSONResponse:
         return JSONResponse(store.get_copilot_history(app_id))
     finally:
         store.close()
+
+
+# -------------------------------------------------------- pipeline (Kanban)
+
+
+@app.get("/api/pipeline")
+def get_pipeline() -> JSONResponse:
+    """Applications grouped by pipeline status for the Kanban board."""
+    store = _store()
+    try:
+        return JSONResponse(store.list_pipeline())
+    finally:
+        store.close()
+
+
+@app.post("/api/pipeline/{app_id}/status")
+async def update_pipeline_status(app_id: int, payload: dict) -> JSONResponse:
+    """Move an application to a new pipeline status."""
+    status = payload.get("status", "")
+    store = _store()
+    try:
+        record = store.get_application(app_id)
+        if not record:
+            raise HTTPException(404, "Application not found")
+        store.update_pipeline_status(app_id, status)
+        return JSONResponse({"ok": True, "status": status})
+    finally:
+        store.close()
+
+
+# --------------------------------------------------- LinkedIn generator
+
+
+@app.post("/api/linkedin/generate")
+async def generate_linkedin(payload: dict) -> JSONResponse:
+    """Generate LinkedIn headline + About section from Master CV."""
+    from hermes.utils.llm_router import LLMUnavailable
+    from hermes.web.master_store import MasterStore
+
+    master = MasterStore(DB_PATH)
+    try:
+        snapshot = master.snapshot()
+    finally:
+        master.close()
+
+    profile = snapshot.get("profile", {})
+    skills = snapshot.get("skills", {})
+    experiences = snapshot.get("experiences", [])[:5]
+    projects = snapshot.get("projects", [])[:3]
+
+    if not profile.get("full_name"):
+        raise HTTPException(400, "Set your name in the Master CV profile first")
+
+    # Build context
+    skills_text = ", ".join(s for group in skills.values() for s in group)
+    exp_text = ""
+    for e in experiences:
+        exp_text += f"- {e.get('title', '')} @ {e.get('organization', '')}: {', '.join(e.get('bullets', [])[:2])}\n"
+    proj_text = ""
+    for p in projects:
+        proj_text += f"- {p.get('name', '')}: {', '.join(p.get('bullets', [])[:2])}\n"
+
+    system_prompt = (
+        "You are a LinkedIn profile copywriter. Generate a professional LinkedIn "
+        "headline (max 220 chars) and an About section (max 2600 chars) using ONLY "
+        "the facts provided. The headline should be concise, keyword-rich for ATS, "
+        "and convey the person's value proposition. The About section should tell "
+        "their career story in first person, highlight key achievements with metrics "
+        "where available, and end with a call to action. Do NOT invent any facts."
+    )
+
+    user_prompt = f"""Generate a LinkedIn headline and About section for:
+
+Name: {profile.get('full_name', '')}
+Current headline: {profile.get('headline', '')}
+Summary: {profile.get('summary', '')[:500]}
+Skills: {skills_text[:600]}
+
+Experience:
+{exp_text or '(none)'}
+
+Projects:
+{proj_text or '(none)'}
+
+Return JSON with keys: "headline" (string, max 220 chars) and "about" (string, max 2600 chars)."""
+
+    router = _router()
+    try:
+        response = router.complete_json(prompt=user_prompt, system=system_prompt)
+        headline = response.get("headline", "")
+        about = response.get("about", "")
+    except (LLMUnavailable, Exception):
+        # Heuristic fallback
+        headline = f"{profile.get('headline', '')} | {skills_text[:100]}"
+        about = (
+            f"Hi, I'm {profile.get('full_name', '')}. "
+            f"{profile.get('summary', 'I build things with code.')}\n\n"
+            f"Core skills: {skills_text[:300]}\n\n"
+            f"Let's connect."
+        )
+
+    return JSONResponse({"headline": headline, "about": about})

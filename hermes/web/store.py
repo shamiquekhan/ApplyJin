@@ -73,6 +73,7 @@ _MIGRATIONS = [
     "ALTER TABLE web_applications ADD COLUMN hiring_manager TEXT DEFAULT ''",
     "ALTER TABLE web_applications ADD COLUMN emails_json TEXT DEFAULT '[]'",
     "ALTER TABLE web_applications ADD COLUMN fit_breakdown_json TEXT DEFAULT ''",
+    "ALTER TABLE web_applications ADD COLUMN pipeline_status TEXT DEFAULT 'saved'",
     "ALTER TABLE web_jds ADD COLUMN ghost_score INTEGER",
     "ALTER TABLE web_jds ADD COLUMN ghost_flags_json TEXT DEFAULT ''",
 ]
@@ -307,3 +308,41 @@ class WebStore:
             (application_id, limit),
         ).fetchall()
         return [dict(r) for r in reversed(rows)]
+
+    # ---------------------------------------------------------- pipeline
+
+    def update_pipeline_status(self, app_id: int, status: str) -> None:
+        valid = ("saved", "tailored", "applied", "interviewing", "offer", "rejected", "ghosted")
+        if status not in valid:
+            raise ValueError(f"Invalid status: {status}")
+        self.conn.execute(
+            "UPDATE web_applications SET pipeline_status = ? WHERE id = ?",
+            (status, app_id),
+        )
+        self.conn.commit()
+
+    def list_pipeline(self) -> dict[str, list[dict]]:
+        """Applications grouped by pipeline status for the Kanban board."""
+        rows = self.conn.execute(
+            "SELECT wa.id, wa.pipeline_status, wa.ats_after, wa.created_at, "
+            "wa.fit_breakdown_json, "
+            "r.name resume_name, j.title jd_title, j.company jd_company "
+            "FROM web_applications wa "
+            "JOIN web_resumes r ON r.id = wa.resume_id "
+            "JOIN web_jds j ON j.id = wa.jd_id "
+            "ORDER BY wa.id DESC"
+        ).fetchall()
+        groups: dict[str, list[dict]] = {
+            "saved": [], "tailored": [], "applied": [],
+            "interviewing": [], "offer": [], "rejected": [], "ghosted": [],
+        }
+        for r in rows:
+            d = dict(r)
+            status = d.get("pipeline_status") or "saved"
+            fb = d.pop("fit_breakdown_json", None)
+            d["fit_breakdown"] = json.loads(fb) if fb else None
+            if status in groups:
+                groups[status].append(d)
+            else:
+                groups["saved"].append(d)
+        return groups

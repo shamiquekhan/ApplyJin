@@ -51,7 +51,7 @@ class SelectionReport:
             lines.append(f"  exp: {e.title} (score {e.score:.2f} | {kws})")
         for p in self.projects:
             kws = ", ".join(p.matched_keywords[:5]) or "-"
-            lines.append(f"  prj: {p.title} (score {e.score:.2f} | {kws})")
+            lines.append(f"  prj: {p.title} (score {p.score:.2f} | {kws})")
         if self.skills:
             lines.append(f"  skills: {', '.join(self.skills[:10])}")
         if self.missing_skills:

@@ -197,12 +197,12 @@ def _heuristic_salary(title: str, location: str = "") -> dict:
         "executive": 1.8,
     }.get(level, 1.0)
 
-    # Location multiplier
+    # Location multiplier — sort keys longest-first to avoid false matches
     loc_mult = 1.0
     loc_lower = location.lower()
-    for city, mult in _LOCATION_MULTIPLIER.items():
+    for city in sorted(_LOCATION_MULTIPLIER, key=len, reverse=True):
         if city in loc_lower:
-            loc_mult = mult
+            loc_mult = _LOCATION_MULTIPLIER[city]
             break
 
     adjusted = int(base * level_mult * loc_mult)
@@ -231,17 +231,28 @@ def get_salary_insights(title: str, location: str = "", company: str = "") -> di
     if adzuna:
         return {**adzuna, "cached": False}
 
+    # Location multiplier — sort keys longest-first so "los angeles" matches
+    # before "la", "san francisco" before "sf", etc.
+    loc_mult = 1.0
+    loc_lower = location.lower()
+    for city in sorted(_LOCATION_MULTIPLIER, key=len, reverse=True):
+        if city in loc_lower:
+            loc_mult = _LOCATION_MULTIPLIER[city]
+            break
+
+    # Apply level multiplier (works for all paths now)
+    level = _detect_level(title)
+    level_mult = {
+        "junior": 0.7,
+        "mid": 1.0,
+        "senior": 1.35,
+        "executive": 1.8,
+    }.get(level, 1.0)
+
     # 2. BLS lookup
     bls_salary = _bls_lookup(title)
     if bls_salary:
-        loc_mult = 1.0
-        loc_lower = location.lower()
-        for city, mult in _LOCATION_MULTIPLIER.items():
-            if city in loc_lower:
-                loc_mult = mult
-                break
-
-        adjusted = int(bls_salary * loc_mult)
+        adjusted = int(bls_salary * loc_mult * level_mult)
         return {
             "min": int(adjusted * 0.8),
             "max": int(adjusted * 1.2),

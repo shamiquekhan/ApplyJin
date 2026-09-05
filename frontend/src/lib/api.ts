@@ -37,6 +37,7 @@ export interface JDSummary {
   company: string;
   preview: string;
   created_at: string;
+  ghost_score?: number | null;
 }
 
 export interface KeywordBuckets {
@@ -52,6 +53,16 @@ export interface Scores {
   keyword_match: number;
   semantic_similarity: number;
   overall: number;
+  matched_keywords?: string[];
+  missing_keywords?: string[];
+}
+
+export interface FitBreakdown {
+  keyword_match: number;
+  semantic_similarity: number;
+  overall: number;
+  matched_keywords: string[];
+  missing_keywords: string[];
 }
 
 export interface TailorResult {
@@ -74,6 +85,7 @@ export interface ApplicationRow {
   resume_name: string;
   jd_title: string;
   jd_company: string;
+  fit_breakdown?: FitBreakdown | null;
 }
 
 async function handle<T>(r: Response): Promise<T> {

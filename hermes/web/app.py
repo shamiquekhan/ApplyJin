@@ -596,6 +596,10 @@ async def add_jd(
     store = _store()
     try:
         jd_id = store.add_jd(title, company, content)
+        # Run ghost-job scoring on the new JD
+        from hermes.utils.ghost_score import score_jd as _ghost_score
+        ghost = _ghost_score(content, title=title, company=company)
+        store.save_jd_ghost_score(jd_id, ghost["ghost_score"], ghost["flags"])
     finally:
         store.close()
     return {"id": jd_id}
@@ -617,6 +621,11 @@ def get_jd(jd_id: int) -> JSONResponse:
         jd = store.get_jd(jd_id)
         if not jd:
             raise HTTPException(404, "JD not found")
+        # Attach ghost score if available
+        ghost = store.get_jd_ghost_score(jd_id)
+        if ghost:
+            jd["ghost_score"] = ghost["ghost_score"]
+            jd["ghost_flags"] = ghost["flags"]
         return JSONResponse(jd)
     finally:
         store.close()
@@ -665,12 +674,21 @@ async def create_application(
         pinned = score_keywords_for(keywords)
         scores = score_pair(resume["raw_text"], jd["content"], keywords)
         app_id = store.create_application(resume_id, jd_id)
+        # Persist the score breakdown as JSON for the Console UI
+        breakdown = {
+            "keyword_match": scores["keyword_match"],
+            "semantic_similarity": scores["semantic_similarity"],
+            "overall": scores["overall"],
+            "matched_keywords": scores.get("matched_keywords", []),
+            "missing_keywords": scores.get("missing_keywords", []),
+        }
         store.update_application(
             app_id,
             kw_before=scores["keyword_match"],
             sem_before=scores["semantic_similarity"],
             ats_before=scores["overall"],
             score_keywords=_json_dump(pinned),
+            fit_breakdown_json=_json_dump(breakdown),
         )
         return JSONResponse({"id": app_id, "scores_before": scores})
     finally:
@@ -789,6 +807,13 @@ async def tailor_application(
             kw_after=scores_after["keyword_match"],
             sem_after=scores_after["semantic_similarity"],
             ats_after=scores_after["overall"],
+            fit_breakdown_json=_json_dump({
+                "keyword_match": scores_after["keyword_match"],
+                "semantic_similarity": scores_after["semantic_similarity"],
+                "overall": scores_after["overall"],
+                "matched_keywords": scores_after.get("matched_keywords", []),
+                "missing_keywords": scores_after.get("missing_keywords", []),
+            }),
             status="ready",
         )
         return JSONResponse(

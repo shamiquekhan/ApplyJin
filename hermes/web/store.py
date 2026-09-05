@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS web_jds (
     company TEXT NOT NULL,
     content TEXT NOT NULL,
     keywords_json TEXT DEFAULT '',
+    ghost_score INTEGER,
+    ghost_flags_json TEXT DEFAULT '',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS web_applications (
@@ -42,6 +44,7 @@ CREATE TABLE IF NOT EXISTS web_applications (
     kw_before REAL, kw_after REAL,
     sem_before REAL, sem_after REAL,
     ats_before REAL, ats_after REAL,
+    fit_breakdown_json TEXT DEFAULT '',
     status TEXT DEFAULT 'draft',
     email_md TEXT DEFAULT '',
     hiring_manager TEXT DEFAULT '',
@@ -62,6 +65,9 @@ _MIGRATIONS = [
     "ALTER TABLE web_applications ADD COLUMN email_md TEXT DEFAULT ''",
     "ALTER TABLE web_applications ADD COLUMN hiring_manager TEXT DEFAULT ''",
     "ALTER TABLE web_applications ADD COLUMN emails_json TEXT DEFAULT '[]'",
+    "ALTER TABLE web_applications ADD COLUMN fit_breakdown_json TEXT DEFAULT ''",
+    "ALTER TABLE web_jds ADD COLUMN ghost_score INTEGER",
+    "ALTER TABLE web_jds ADD COLUMN ghost_flags_json TEXT DEFAULT ''",
 ]
 
 
@@ -75,14 +81,23 @@ class WebStore:
         self.conn.commit()
 
     def _migrate(self) -> None:
-        existing = {
+        existing_apps = {
             row["name"]
             for row in self.conn.execute("PRAGMA table_info(web_applications)")
         }
+        existing_jds = {
+            row["name"]
+            for row in self.conn.execute("PRAGMA table_info(web_jds)")
+        }
         for stmt in _MIGRATIONS:
             col = stmt.split("ADD COLUMN ")[1].split(" ")[0]
-            if col not in existing:
-                self.conn.execute(stmt)
+            # Determine which table this migration targets
+            if "web_jds" in stmt:
+                if col not in existing_jds:
+                    self.conn.execute(stmt)
+            else:
+                if col not in existing_apps:
+                    self.conn.execute(stmt)
 
     def close(self) -> None:
         self.conn.close()
@@ -148,7 +163,8 @@ class WebStore:
 
     def list_jds(self) -> list[dict]:
         rows = self.conn.execute(
-            "SELECT id, title, company, created_at, substr(content, 1, 200) preview "
+            "SELECT id, title, company, created_at, ghost_score, "
+            "substr(content, 1, 200) preview "
             "FROM web_jds ORDER BY id DESC"
         ).fetchall()
         return [dict(r) for r in rows]
@@ -172,6 +188,25 @@ class WebStore:
             (json.dumps(keywords), jd_id),
         )
         self.conn.commit()
+
+    def save_jd_ghost_score(self, jd_id: int, ghost_score: int, flags: list[str]) -> None:
+        self.conn.execute(
+            "UPDATE web_jds SET ghost_score = ?, ghost_flags_json = ? WHERE id = ?",
+            (ghost_score, json.dumps(flags), jd_id),
+        )
+        self.conn.commit()
+
+    def get_jd_ghost_score(self, jd_id: int) -> Optional[dict]:
+        row = self.conn.execute(
+            "SELECT ghost_score, ghost_flags_json FROM web_jds WHERE id = ?",
+            (jd_id,),
+        ).fetchone()
+        if not row or row["ghost_score"] is None:
+            return None
+        return {
+            "ghost_score": row["ghost_score"],
+            "flags": json.loads(row["ghost_flags_json"] or "[]"),
+        }
 
     # ---------------------------------------------------------- applications
 
@@ -207,19 +242,27 @@ class WebStore:
         record = dict(row)
         record["selected_keywords"] = json.loads(record.get("selected_keywords") or "[]")
         record["score_keywords"] = json.loads(record.get("score_keywords") or "[]")
+        fb = record.get("fit_breakdown_json")
+        record["fit_breakdown"] = json.loads(fb) if fb else None
         return record
 
     def list_applications(self) -> list[dict]:
         rows = self.conn.execute(
             "SELECT wa.id, wa.status, wa.ats_before, wa.ats_after, "
-            "wa.kw_before, wa.kw_after, wa.created_at, "
+            "wa.kw_before, wa.kw_after, wa.fit_breakdown_json, wa.created_at, "
             "r.name resume_name, j.title jd_title, j.company jd_company "
             "FROM web_applications wa "
             "JOIN web_resumes r ON r.id = wa.resume_id "
             "JOIN web_jds j ON j.id = wa.jd_id "
             "ORDER BY wa.id DESC"
         ).fetchall()
-        return [dict(r) for r in rows]
+        result = []
+        for r in rows:
+            d = dict(r)
+            fb = d.pop("fit_breakdown_json", None)
+            d["fit_breakdown"] = json.loads(fb) if fb else None
+            result.append(d)
+        return result
 
     # ---------------------------------------------------------- waitlist
 

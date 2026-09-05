@@ -106,11 +106,16 @@ def _as_analysis(title: str, company: str, keywords: dict) -> JobAnalysis:
 
 
 def score_pair(resume_text: str, jd_text: str, keywords: dict) -> dict:
-    """Keyword-match %, semantic %, and combined ATS % (0-100 scale).
+    """Keyword-match %, semantic %, combined ATS %, and keyword details (0-100).
 
-    Keyword match uses word-boundary skill matching (skill_match) —
-    substring matching inflated scores ("R" matched "React") and missed
-    multi-word skills ("machine learning").
+    Returns:
+        {
+            "keyword_match": float,       # 0-100
+            "semantic_similarity": float,  # 0-100
+            "overall": float,             # 0-100 (0.6*kw + 0.4*sem)
+            "matched_keywords": list[str], # skills found in resume
+            "missing_keywords": list[str], # skills NOT found in resume
+        }
     """
     from hermes.utils.embeddings import cosine_similarity, get_embeddings
     from hermes.utils.skill_match import skill_coverage
@@ -120,7 +125,7 @@ def score_pair(resume_text: str, jd_text: str, keywords: dict) -> dict:
         + keywords.get("tools", [])
     ) or _extract_heuristic(jd_text)["hard_skills"]
 
-    kw, _matched, _missing = skill_coverage(required, resume_text)
+    kw, matched, missing = skill_coverage(required, resume_text)
 
     emb = get_embeddings()
     sem = max(
@@ -134,6 +139,8 @@ def score_pair(resume_text: str, jd_text: str, keywords: dict) -> dict:
         "keyword_match": round(kw * 100, 1),
         "semantic_similarity": round(sem * 100, 1),
         "overall": round(combined * 100, 1),
+        "matched_keywords": matched,
+        "missing_keywords": missing,
     }
 
 

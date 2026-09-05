@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, Database, Download, FileText, Loader2, Mail, Settings, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Database, Download, FileText, Loader2, Mail, Settings, Shield, Sparkles, Trash2 } from "lucide-react";
 import * as api from "../lib/api";
 import { markdownToHtml } from "../lib/markdown";
 import type { ApplicationRow, KeywordBuckets, ResumeSummary, JDSummary, Scores, TailorResult, MasterStats, MasterExperience, MasterProject } from "../lib/api";
@@ -12,6 +12,17 @@ import { fetchMe, logout } from "../lib/session";
 const cardCls = "bg-[#101010] rounded-2xl border border-primary/10";
 const inputCls =
   "w-full bg-black/40 border border-primary/20 rounded-xl px-4 py-2.5 text-sm text-[#E1E0CC] placeholder:text-primary/30 outline-none focus:border-primary/50 transition-colors";
+
+function GhostBadge({ score }: { score: number | null | undefined }) {
+  if (score == null) return null;
+  const color = score >= 80 ? "text-emerald-400" : score >= 50 ? "text-amber-400" : "text-red-400";
+  const label = score >= 80 ? "Likely genuine" : score >= 50 ? "Possibly stale" : "Likely stale";
+  return (
+    <span className={`text-[10px] px-2 py-0.5 rounded-full border ${color} border-current/20`} title={label}>
+      <Shield className="w-2.5 h-2.5 inline -mt-0.5 mr-0.5" />{score}
+    </span>
+  );
+}
 
 function Toast({ note }: { note: { text: string; error?: boolean } | null }) {
   return (
@@ -173,8 +184,13 @@ function JDsPanel({ toast }: { toast: (t: string, error?: boolean) => void }) {
           {jds.length === 0 && <p className="text-primary/40 text-sm">No job descriptions yet.</p>}
           {jds.map((j) => (
             <div key={j.id} className="border border-primary/10 rounded-xl p-4">
-              <p className="font-medium text-sm" style={{ color: "#E1E0CC" }}>{j.title}</p>
-              <p className="text-primary/50 text-xs mt-0.5">{j.company}</p>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-medium text-sm" style={{ color: "#E1E0CC" }}>{j.title}</p>
+                  <p className="text-primary/50 text-xs mt-0.5">{j.company}</p>
+                </div>
+                <GhostBadge score={j.ghost_score} />
+              </div>
               <p className="text-primary/40 text-xs mt-2 line-clamp-3">{j.preview}</p>
             </div>
           ))}
@@ -303,6 +319,26 @@ function TailorPanel({ toast }: { toast: (t: string, error?: boolean) => void })
                 <Bar value={before[k]} tone="bg-primary/40" />
               </div>
             ))}
+            {before.matched_keywords && before.matched_keywords.length > 0 && (
+              <div className="pt-2">
+                <p className="text-[10px] text-primary/40 mb-1">Matched</p>
+                <div className="flex flex-wrap gap-1">
+                  {before.matched_keywords.map((kw) => (
+                    <span key={kw} className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300/80">{kw}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {before.missing_keywords && before.missing_keywords.length > 0 && (
+              <div className="pt-1">
+                <p className="text-[10px] text-primary/40 mb-1">Missing</p>
+                <div className="flex flex-wrap gap-1">
+                  {before.missing_keywords.map((kw) => (
+                    <span key={kw} className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300/80">{kw}</span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -611,6 +647,31 @@ function MasterPanel({ toast }: { toast: (t: string, error?: boolean) => void })
 
 /* ---------- panel: Applications ---------- */
 
+function FitBreakdownBadge({ breakdown }: { breakdown: api.FitBreakdown | null | undefined }) {
+  if (!breakdown) return <span className="text-primary/30 text-xs">—</span>;
+  return (
+    <div className="flex flex-col gap-1 min-w-[140px]">
+      {([
+        { label: "Keyword", value: breakdown.keyword_match },
+        { label: "Semantic", value: breakdown.semantic_similarity },
+      ] as const).map(({ label, value }) => (
+        <div key={label} className="flex items-center gap-1.5">
+          <span className="text-[9px] text-primary/40 w-12 shrink-0">{label}</span>
+          <div className="flex-1 h-1 bg-primary/10 rounded-full overflow-hidden">
+            <div className="h-full bg-primary/60 rounded-full" style={{ width: `${Math.min(value, 100)}%` }} />
+          </div>
+          <span className="text-[9px] text-primary/50 w-7 text-right">{value.toFixed(0)}%</span>
+        </div>
+      ))}
+      {breakdown.missing_keywords.length > 0 && (
+        <p className="text-[9px] text-amber-400/70 mt-0.5" title={`Missing: ${breakdown.missing_keywords.join(", ")}`}>
+          Missing {breakdown.missing_keywords.length} skills
+        </p>
+      )}
+    </div>
+  );
+}
+
 function ApplicationsPanel() {
   const [apps, setApps] = useState<ApplicationRow[]>([]);
   const refresh = useCallback(async () => {
@@ -634,6 +695,7 @@ function ApplicationsPanel() {
                 <th className="px-6 py-3 text-left font-medium">Role</th>
                 <th className="px-4 py-3 text-left font-medium">Company</th>
                 <th className="px-4 py-3 text-left font-medium">Resume</th>
+                <th className="px-4 py-3 text-left font-medium">Fit breakdown</th>
                 <th className="px-4 py-3 text-right font-medium">ATS</th>
                 <th className="px-4 py-3 text-right font-medium">Δ</th>
                 <th className="px-6 py-3 text-right font-medium">Files</th>
@@ -647,6 +709,7 @@ function ApplicationsPanel() {
                     <td className="px-6 py-3.5 font-medium" style={{ color: "#E1E0CC" }}>{a.jd_title}</td>
                     <td className="px-4 py-3.5 text-primary/60">{a.jd_company}</td>
                     <td className="px-4 py-3.5 text-primary/60">{a.resume_name}</td>
+                    <td className="px-4 py-3.5"><FitBreakdownBadge breakdown={a.fit_breakdown} /></td>
                     <td className="px-4 py-3.5 text-right text-primary/80">{(a.ats_after ?? a.ats_before ?? 0).toFixed(1)}%</td>
                     <td className={`px-4 py-3.5 text-right font-medium ${delta >= 0 ? "text-primary" : "text-amber-300/70"}`}>
                       {delta >= 0 ? "+" : ""}{delta.toFixed(1)}

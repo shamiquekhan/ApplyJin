@@ -38,9 +38,10 @@ export function Footer() {
             </p>
             <ul className="space-y-3">
               <li><a href="#how-it-works" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>How it works</a></li>
-              <li><a href="#learning-loop" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>Learning loop</a></li>
+              <li><a href="/features" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>Features</a></li>
               <li><a href="/dashboard" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>Console</a></li>
-              <li><a href="#features" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>Features</a></li>
+              <li><a href="/changelog" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>Changelog</a></li>
+              <li><a href="/extension" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>Chrome extension</a></li>
             </ul>
           </div>
 
@@ -50,8 +51,9 @@ export function Footer() {
               Resources
             </p>
             <ul className="space-y-3">
-              <li><a href="#how-it-works" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>Guardrails</a></li>
-              <li><a href="/docs" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>API reference</a></li>
+              <li><a href="/guardrails" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>Guardrails</a></li>
+              <li><a href="/api" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>API reference</a></li>
+              <li><a href="/tutorial" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>Tutorial</a></li>
               <li><a href="https://github.com/shamiquekhan/ApplyJin" target="_blank" rel="noopener noreferrer" className="text-sm transition-colors break-words inline-block py-1" style={{ color: "rgba(225, 224, 204, 0.8)" }}>GitHub</a></li>
             </ul>
           </div>

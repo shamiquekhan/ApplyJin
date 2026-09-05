@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ArrowRight, Bot, Check, Database, Download, FileText, Loader2, Link, Mail, Settings, Shield, Sparkles, Trash2 } from "lucide-react";
 import * as api from "../lib/api";
 import { markdownToHtml } from "../lib/markdown";
+import { LoginScreen } from "./LoginScreen";
 import type { ApplicationRow, KeywordBuckets, ResumeSummary, JDSummary, Scores, TailorResult, MasterStats, MasterExperience, MasterProject } from "../lib/api";
 import { navigate } from "../lib/router";
 import { fetchMe, logout } from "../lib/session";

@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowLeft, ArrowRight, BookOpen, Code, FileText, Globe, Mail, Newspaper, Rocket, Shield, Terminal } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Code, ExternalLink, FileText, Globe, Mail, Newspaper, Rocket, Shield, Terminal } from "lucide-react";
 import { WordsPullUpMultiStyle } from "./WordsPullUp";
 import { navigate } from "../lib/router";
 
@@ -26,7 +26,7 @@ const RESOURCES = [
     tag: "Developer",
   },
   {
-    icon: <Github className="w-5 h-5" />,
+    icon: <ExternalLink className="w-5 h-5" />,
     title: "GitHub Repository",
     desc: "Source code, issues, and releases. Star the repo if you find it useful.",
     link: "https://github.com/shamiquekhan/ApplyJin",
@@ -34,7 +34,7 @@ const RESOURCES = [
     tag: "Code",
   },
   {
-    icon: <Chrome className="w-5 h-5" />,
+    icon: <Globe className="w-5 h-5" />,
     title: "Chrome Extension",
     desc: "Auto-fill job applications directly from your browser. Supports LinkedIn, Greenhouse, Lever, and more.",
     link: "/extension",

@@ -116,33 +116,75 @@ and 15+ specialized skills (ATS optimization, no-invention guardrails) are
 woven into the prompt. Guardrail violations are surfaced in the UI before
 you see the output.
 
-### 4. LaTeX PDF Export
+### 4. Fit-Score Breakdown
+Every tailored application shows a decomposed score across four dimensions:
+keyword overlap (0.35), semantic similarity (0.35), seniority alignment (0.15),
+and experience depth (0.15). Per-category keyword bars break down coverage
+into hard skills, tools, soft skills, certifications, and domain keywords —
+so you can see exactly which areas to strengthen.
+
+### 5. Ghost-Job Scoring
+A heuristic 0–100 genuineness score assigned to every job description.
+Flags vague requirements, excessive buzzwords, templated language, red-flag
+phrases (e.g., "fast-paced", "wear many hats"), salary disclosure, title
+specificity, and posting age. Helps you avoid wasting time on fake or
+recycled listings.
+
+### 6. LaTeX PDF Export
 Professional-quality PDFs via `pdflatex` using the Trey Hunner resume
 template. Cover letters in a matching template. Editable `.tex` source
 included. Falls back to Playwright browser print when LaTeX is unavailable.
 
-### 5. Fabrication Guardrails
+### 7. Fabrication Guardrails
 Every tailored fact traces back to your Master CV database. Invented
 companies, dates, or gap-skills are flagged before you ever see them.
 The agent never auto-submits — you click the final button, every time.
 
-### 6. Learning Loop
+### 8. Learning Loop
 Every application is randomly assigned variant A or B. Once 30+ outcomes
 accumulate, a Yates-corrected chi-squared test declares the winning resume
 style, and its phrasing patterns are promoted into the tailor prompt
 (versioned, rollback-able). Style guides, keyword lift analysis, and
 ATS-delta correlation feed back into the next tailor run.
 
-### 7. Email Triage & Outreach
+### 9. RAG Chat Copilot
+A grounded chat assistant that answers questions about any tailored match.
+Uses your Master CV + ChromaDB experience library + JD context to provide
+fabrication-free answers. Chat history is persisted per application so
+conversations survive page reloads.
+
+### 10. Kanban Pipeline
+A drag-and-drop board with 7 status columns: Saved → Tailored → Applied →
+Interviewing → Offer → Rejected → Ghosted. Move applications between columns
+with one click. The pipeline gives you a real-time view of your entire
+application lifecycle.
+
+### 11. LinkedIn Profile Generator
+One-click generation of a keyword-rich LinkedIn headline (max 220 chars)
+and an engaging About section (max 2600 chars) from your Master CV data.
+LLM-grounded with no-fabrication guardrails. Copy to clipboard with
+one click.
+
+### 12. Research Panel
+- **Visa sponsorship**: DOL OFLC lookup with 200+ known sponsors, keyword-based JD scanning, user-override cache, confidence scoring
+- **Salary insights**: BLS OES medians for 40+ tech roles, location cost-of-living multipliers for 30 cities, Adzuna free-tier API integration, role-level adjustment
+
+### 13. Chrome Extension
+A Manifest V3 extension that auto-fills job application forms with your
+tailored resume data. Detects form fields across LinkedIn, Greenhouse,
+Lever, Workday, and generic job boards. Extracts job descriptions and
+scores them via the backend. Never auto-submits.
+
+### 14. Email Triage & Outreach
 Connect IMAP to auto-classify offer, interview, and rejection emails.
 Fuzzy company matching feeds outcomes into the tracker automatically.
 The outreach agent drafts LinkedIn connection notes and follow-up emails.
 
-### 8. Stealth Auto-Fill
+### 15. Stealth Auto-Fill
 A hardened Playwright browser fills application forms using your real
 resume data — but never auto-submits. You click submit, every time.
 
-### 9. Interview Prep
+### 16. Interview Prep
 STAR stories generated from your real experience library. Questions are
 matched to the job description and answered using only your actual
 accomplishments.
@@ -162,27 +204,31 @@ hermes run
    │             (heuristic lexicon fallback when keyless/rate-limited)
    ▼
 3. FIT SCORER ── 0.35·keyword + 0.35·semantic + 0.15·seniority + 0.15·years
+   │             → decomposed score + per-category keyword breakdown
    │             jobs below threshold are skipped with reasons
    ▼
-4. SELECTOR ──── rank Master CV entries vs this JD
+4. GHOST SCORE ─ heuristic genuineness check (0-100)
+   │             flags vague/buzzword/templated/red-flag JDs
+   ▼
+5. SELECTOR ──── rank Master CV entries vs this JD
    │             top-3 experiences + top-3 projects + skill intersection
    ▼
-5. TAILOR v3 ─── LLM composes from selected facts only
+6. TAILOR v3 ─── LLM composes from selected facts only
    │             guardrails validate output vs master DB (no fabrication)
    ▼
-6. COVER LETTER / EMAIL TEMPLATES ── grounded in the same selection
+7. COVER LETTER / EMAIL TEMPLATES ── grounded in the same selection
    │
    ▼
-7. EXPORT ────── resume.md → LaTeX (.tex + resume.cls) → pdflatex PDF
+8. EXPORT ────── resume.md → LaTeX (.tex + resume.cls) → pdflatex PDF
    │             cover letter in matching template
    ▼
-8. TRACKER ───── SQLite row: fit score, ATS before/after, A/B variant
-   │
+9. TRACKER ───── SQLite row: fit score, ATS before/after, A/B variant
+   │             pipeline status: saved → tailored → applied → ...
    ▼  human reviews → hermes review → hermes fill (never auto-submit)
    │
    ▼ outcomes flow back (manual or email triage):
-9. LEARNING ─── keyword lift + ATS-delta correlation + A/B chi²
-                → style guide vN → injected into next tailor run
+10. LEARNING ─── keyword lift + ATS-delta correlation + A/B chi²
+                 → style guide vN → injected into next tailor run
 ```
 
 **The learning loop in one line:** every application is randomly assigned
@@ -218,8 +264,9 @@ watch the A/B verdicts in the Console.
 ┌─────────────────────────── FRONTEND (ApplyJin) ───────────────────────────┐
 │  React 18 + Vite + TypeScript + Tailwind CSS + framer-motion              │
 │  Landing page (cinematic, Almarai/Instrument Serif, WCAG 2.2 AA)          │
-│  Console at /dashboard — Master CV · Resumes · JDs · Tailor & Score ·      │
-│  Applications · Settings                                                  │
+│  Console at /dashboard — 9 tabs:                                          │
+│  Master CV · Resumes · JDs · Tailor & Score · Applications · Pipeline ·   │
+│  LinkedIn · Research · Settings                                            │
 └──────────────────────────────┬───────────────────────────────────────────┘
                                │ REST (same origin / Vite proxy)
 ┌──────────────────────────────▼───────────────────────────────────────────┐
@@ -232,9 +279,16 @@ watch the A/B verdicts in the Console.
 │  └────────────┘  └─────────────┘  └──────────────┘  └─────────────────┘ │
 │                                                                           │
 │  ┌────────────┐  ┌─────────────┐  ┌──────────────┐  ┌─────────────────┐ │
-│  │ Job Scout   │  │ JD Analyzer │  │ ATS Scorer   │  │ Learning Loop   │ │
-│  │ (JobSpy +   │  │ (Gemini +   │  │ (word-bound. │  │ (A/B chi² +     │ │
-│  │  ATS APIs)  │  │  heuristic) │  │  + semantic) │  │  style guides)  │ │
+│  │ Job Scout   │  │ JD Analyzer │  │ ATS Scorer   │  │ Ghost Scorer    │ │
+│  │ (JobSpy +   │  │ (Gemini +   │  │ (word-bound. │  │ (heuristic      │ │
+│  │  ATS APIs)  │  │  heuristic) │  │  + semantic) │  │  0-100)         │ │
+│  └────────────┘  └─────────────┘  └──────────────┘  └─────────────────┘ │
+│                                                                           │
+│  ┌────────────┐  ┌─────────────┐  ┌──────────────┐  ┌─────────────────┐ │
+│  │ Learning    │  │ RAG Chat    │  │ Pipeline     │  │ Visa + Salary   │ │
+│  │ Loop        │  │ Copilot     │  │ (Kanban)     │  │ Research        │ │
+│  │ (A/B chi² + │  │ (Master CV  │  │ (7 statuses) │  │ (DOL OFLC +     │ │
+│  │  guides)    │  │  + RAG)     │  │              │  │  BLS + Adzuna)  │ │
 │  └────────────┘  └─────────────┘  └──────────────┘  └─────────────────┘ │
 │                                                                           │
 │  LLM Router: Gemini 3.6 Flash → flash-latest → flash-lite (model-pool    │
@@ -244,13 +298,18 @@ watch the A/B verdicts in the Console.
                     SQLite (data/hermes.db)
         ChromaDB (experience-library vectors, ONNX MiniLM)
         File artifacts (resumes, letters, .tex bundles, PDFs)
+
+┌─────────────────────────── CHROME EXTENSION ─────────────────────────────┐
+│  Manifest V3 · Auto-fill · JD extraction · Ghost scoring                 │
+│  Detects fields across LinkedIn, Greenhouse, Lever, Workday              │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Tech stack — all free / open source
 
 | Layer | Technology | Notes |
 |---|---|---|
-| Frontend | React 18, Vite, TypeScript, Tailwind, framer-motion, lucide-react | Cinematic dark theme, WCAG 2.2 AA audited |
+| Frontend | React 18, Vite, TypeScript, Tailwind, framer-motion, lucide-react | Cinematic dark theme, WCAG 2.2 AA audited, 9-tab Console |
 | Backend | Python 3.11+, FastAPI, Uvicorn, Pydantic | 40+ REST endpoints |
 | LLM | Google Gemini free tier via LiteLLM | Model-pool rotation, rate-limit-aware retry, heuristic fallback |
 | Embeddings | ONNX MiniLM (ChromaDB-bundled) | No torch needed; fully local |
@@ -258,6 +317,8 @@ watch the A/B verdicts in the Console.
 | Scraping | JobSpy, Greenhouse/Lever public APIs | 8+ boards, ToS-friendly |
 | Documents | pdflatex, Playwright, WeasyPrint, pdfplumber, python-docx | LaTeX-first PDF generation with fallbacks |
 | Browser automation | Playwright (stealth-hardened) | Auto-fill that never auto-submits |
+| Research | DOL OFLC (visa), BLS OES (salary), Adzuna API (salary) | Visa sponsorship + salary insights |
+| Chrome extension | Manifest V3, content scripts, service worker | Auto-fill + JD extraction + ghost scoring |
 | Storage | SQLite | Tracker + master CV + web store, one file |
 
 ---
@@ -358,13 +419,21 @@ ApplyJin/
 │   ├── web/                 # FastAPI app, auth, master store, selection engine,
 │   │                        # tailor v3, web store, LLM settings
 │   ├── utils/               # LLM router, embeddings, skill matching,
-│   │                        # LaTeX generator, PDF, experience library
+│   │                        # LaTeX generator, PDF, experience library,
+│   │                        # ghost scoring, visa sponsorship, salary insights
 │   ├── prompts/             # LLM prompt templates
 │   └── cli.py               # Typer CLI (15 commands)
 ├── frontend/                # ApplyJin React app
 │   ├── src/components/      # Hero, About, Features, Waitlist, Footer, Console,
-│   │                        # FeaturesPage, LoginScreen, AuthCallback
+│   │                        # FeaturesPage, LoginScreen, AuthCallback,
+│   │                        # KanbanBoard, CopilotChat, ResearchPanel
 │   └── src/lib/             # api client, session (JWT), router, markdown
+├── extension/               # Chrome extension (Manifest V3)
+│   ├── manifest.json        # Extension config
+│   ├── popup.html/js        # 3-tab popup UI (Autofill / Extract JD / Settings)
+│   ├── content.js/css       # Content script (form detection + autofill)
+│   ├── background.js        # Service worker
+│   └── icons/               # Extension icons (16/48/128px)
 ├── tests/                   # 164 tests across 7 suites
 ├── scripts/                 # cron wrappers, demo seeder
 ├── config/                  # YAML configs (examples committed)

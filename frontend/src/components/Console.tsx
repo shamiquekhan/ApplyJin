@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, Database, Download, FileText, Loader2, Mail, Settings, Shield, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Check, Database, Download, FileText, Loader2, Mail, Settings, Shield, Sparkles, Trash2 } from "lucide-react";
 import * as api from "../lib/api";
 import { markdownToHtml } from "../lib/markdown";
 import type { ApplicationRow, KeywordBuckets, ResumeSummary, JDSummary, Scores, TailorResult, MasterStats, MasterExperience, MasterProject } from "../lib/api";
 import { navigate } from "../lib/router";
 import { fetchMe, logout } from "../lib/session";
+import { CopilotChat } from "./CopilotChat";
 
 /* ---------- shared atoms (ApplyJin design system) ---------- */
 
@@ -293,7 +294,7 @@ function TailorPanel({ toast }: { toast: (t: string, error?: boolean) => void })
   return (
     <div className="grid lg:grid-cols-12 gap-4">
       {/* step 1 */}
-      <div className={`${cardCls} p-6 lg:col-span-4 space-y-3 h-fit`}>
+      <div className={`${cardCls} p-6 lg:col-span-3 space-y-3 h-fit`}>
         <h3 className="text-lg font-medium" style={{ color: "#E1E0CC" }}>1 · Pair them up</h3>
         <select className={inputCls} value={resumeId} onChange={(e) => setResumeId(e.target.value)}>
           <option value="">Choose a resume…</option>
@@ -344,7 +345,7 @@ function TailorPanel({ toast }: { toast: (t: string, error?: boolean) => void })
       </div>
 
       {/* step 2 */}
-      <div className={`${cardCls} p-6 lg:col-span-4 h-fit`}>
+      <div className={`${cardCls} p-6 lg:col-span-3 h-fit`}>
         <h3 className="text-lg font-medium mb-4" style={{ color: "#E1E0CC" }}>2 · Choose keywords</h3>
         {!keywords ? (
           <p className="text-primary/40 text-sm py-8">Pair a resume and a job description first.</p>
@@ -381,7 +382,7 @@ function TailorPanel({ toast }: { toast: (t: string, error?: boolean) => void })
       </div>
 
       {/* step 3 */}
-      <div className={`${cardCls} p-6 lg:col-span-4 h-fit`}>
+      <div className={`${cardCls} p-6 lg:col-span-3 h-fit`}>
         <h3 className="text-lg font-medium mb-4" style={{ color: "#E1E0CC" }}>3 · Review &amp; download</h3>
         {!result ? (
           <p className="text-primary/40 text-sm py-8">Tailored output lands here.</p>
@@ -482,11 +483,18 @@ function TailorPanel({ toast }: { toast: (t: string, error?: boolean) => void })
           </>
         )}
       </div>
+
+      {/* copilot sidebar */}
+      <div className={`${cardCls} p-6 lg:col-span-3 h-fit`}>
+        <div className="flex items-center gap-2 mb-4">
+          <Bot className="w-4 h-4 text-primary" />
+          <h3 className="text-sm font-medium" style={{ color: "#E1E0CC" }}>Copilot</h3>
+        </div>
+        <CopilotChat applicationId={appId} />
+      </div>
     </div>
   );
 }
-
-/* ---------- panel: Master CV database ---------- */
 
 function MasterPanel({ toast }: { toast: (t: string, error?: boolean) => void }) {
   const [stats, setStats] = useState<MasterStats | null>(null);
@@ -649,8 +657,16 @@ function MasterPanel({ toast }: { toast: (t: string, error?: boolean) => void })
 
 function FitBreakdownBadge({ breakdown }: { breakdown: api.FitBreakdown | null | undefined }) {
   if (!breakdown) return <span className="text-primary/30 text-xs">—</span>;
+  const cats = breakdown.categories;
+  const categoryLabels: Record<string, string> = {
+    hard_skills: "Hard skills",
+    tools: "Tools",
+    soft_skills: "Soft skills",
+    certifications: "Certs",
+    domain_keywords: "Domain",
+  };
   return (
-    <div className="flex flex-col gap-1 min-w-[140px]">
+    <div className="flex flex-col gap-1 min-w-[160px]">
       {([
         { label: "Keyword", value: breakdown.keyword_match },
         { label: "Semantic", value: breakdown.semantic_similarity },
@@ -663,6 +679,23 @@ function FitBreakdownBadge({ breakdown }: { breakdown: api.FitBreakdown | null |
           <span className="text-[9px] text-primary/50 w-7 text-right">{value.toFixed(0)}%</span>
         </div>
       ))}
+      {cats && Object.entries(cats).map(([key, cat]) => {
+        if (!cat || (cat.matched.length === 0 && cat.missing.length === 0)) return null;
+        return (
+          <div key={key} className="flex items-center gap-1.5">
+            <span className="text-[9px] text-primary/40 w-12 shrink-0 truncate" title={categoryLabels[key] || key}>
+              {categoryLabels[key] || key}
+            </span>
+            <div className="flex-1 h-1 bg-primary/10 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full ${cat.coverage >= 70 ? "bg-emerald-500/60" : cat.coverage >= 40 ? "bg-amber-500/60" : "bg-red-500/60"}`}
+                style={{ width: `${cat.coverage}%` }}
+              />
+            </div>
+            <span className="text-[9px] text-primary/50 w-7 text-right">{cat.coverage.toFixed(0)}%</span>
+          </div>
+        );
+      })}
       {breakdown.missing_keywords.length > 0 && (
         <p className="text-[9px] text-amber-400/70 mt-0.5" title={`Missing: ${breakdown.missing_keywords.join(", ")}`}>
           Missing {breakdown.missing_keywords.length} skills

@@ -673,6 +673,9 @@ async def create_application(
 
         pinned = score_keywords_for(keywords)
         scores = score_pair(resume["raw_text"], jd["content"], keywords)
+        # Per-category breakdown (hard_skills, tools, soft_skills, etc.)
+        from hermes.web.pipeline import category_breakdown
+        categories = category_breakdown(resume["raw_text"], keywords)
         app_id = store.create_application(resume_id, jd_id)
         # Persist the score breakdown as JSON for the Console UI
         breakdown = {
@@ -681,6 +684,7 @@ async def create_application(
             "overall": scores["overall"],
             "matched_keywords": scores.get("matched_keywords", []),
             "missing_keywords": scores.get("missing_keywords", []),
+            "categories": categories,
         }
         store.update_application(
             app_id,
@@ -732,6 +736,7 @@ async def tailor_application(
         score_keywords_for,
         score_pair,
         tailor as run_tailor,
+        category_breakdown,
     )
     from hermes.web.master_store import MasterStore
     from hermes.web.selection import select_for_jd
@@ -791,6 +796,9 @@ async def tailor_application(
         scores_after = score_pair(
             result["tailored_resume_md"], jd["content"], {"hard_skills": pinned}
         )
+        # Per-category breakdown on the tailored resume
+        tailoring_keywords = jd.get("keywords") or {}
+        tailoring_categories = category_breakdown(result["tailored_resume_md"], tailoring_keywords)
         delta = {
             "overall": round(scores_after["overall"] - (record["ats_before"] or 0), 1),
             "keyword_match": round(
@@ -813,6 +821,7 @@ async def tailor_application(
                 "overall": scores_after["overall"],
                 "matched_keywords": scores_after.get("matched_keywords", []),
                 "missing_keywords": scores_after.get("missing_keywords", []),
+                "categories": tailoring_categories,
             }),
             status="ready",
         )
@@ -1030,3 +1039,135 @@ async def score(
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok", "time": datetime.utcnow().isoformat()}
+
+
+# -------------------------------------------------------- copilot chat
+
+
+@app.post("/api/copilot/chat")
+async def copilot_chat(payload: dict) -> JSONResponse:
+    """RAG-grounded chat copilot. Context: Master CV + ChromaDB + JD."""
+    from hermes.utils.llm_router import LLMUnavailable
+    from hermes.web.master_store import MasterStore
+
+    app_id = payload.get("application_id")
+    user_message = payload.get("message", "").strip()
+    if not user_message:
+        raise HTTPException(400, "Message is required")
+
+    store = _store()
+    try:
+        # Build context
+        jd_text = ""
+        tailored_text = ""
+        if app_id:
+            record = store.get_application(app_id)
+            if record:
+                jd = store.get_jd(record["jd_id"])
+                if jd:
+                    jd_text = jd["content"][:3000]
+                tailored_text = (record.get("tailored_resume_md") or "")[:2000]
+                # Save user message
+                store.add_copilot_message(app_id, "user", user_message)
+
+        # Master CV context
+        master = MasterStore(DB_PATH)
+        try:
+            snapshot = master.snapshot()
+        finally:
+            master.close()
+
+        profile = snapshot.get("profile", {})
+        skills = snapshot.get("skills", {})
+        experiences = snapshot.get("experiences", [])[:5]
+        projects = snapshot.get("projects", [])[:3]
+
+        # RAG: retrieve relevant bullets from ChromaDB
+        bullets_text = ""
+        try:
+            from hermes.utils.experience_library import ExperienceLibrary
+            library = ExperienceLibrary(use_chroma=True)
+            retrieved = library.query(user_message, n_results=8)
+            if retrieved:
+                bullets_text = "\n".join(f"- {r['text']}" for r in retrieved)
+        except Exception:
+            pass  # ChromaDB unavailable — proceed without RAG
+
+        # Assemble context
+        exp_text = ""
+        for e in experiences:
+            exp_text += f"\n### {e.get('title', '')} @ {e.get('organization', '')}\n"
+            for b in e.get("bullets", [])[:3]:
+                exp_text += f"- {b}\n"
+
+        proj_text = ""
+        for p in projects:
+            proj_text += f"\n### {p.get('name', '')}\n"
+            for b in p.get("bullets", [])[:2]:
+                proj_text += f"- {b}\n"
+
+        skills_text = ", ".join(s for group in skills.values() for s in group)
+
+        system_prompt = (
+            "You are ApplyJin Copilot, a career assistant grounded in the user's "
+            "verified resume facts. You can rephrase, contextualize, and advise, "
+            "but NEVER invent achievements, skills, dates, or companies not present "
+            "in the provided facts. If you don't have enough information, say so "
+            "clearly. Keep responses concise and actionable."
+        )
+
+        user_prompt = f"""## User Question
+{user_message}
+
+## Candidate Profile
+Name: {profile.get('full_name', 'N/A')}
+Headline: {profile.get('headline', 'N/A')}
+Summary: {profile.get('summary', 'N/A')[:500]}
+Skills: {skills_text[:800]}
+
+## Relevant Experience (RAG-retrieved)
+{bullets_text or '(no relevant bullets found)'}
+
+## Work History
+{exp_text or '(none)'}
+
+## Projects
+{proj_text or '(none)'}
+
+## Target Job Description
+{jd_text or '(no specific job targeted)'}
+
+## Currently Tailored Resume (if any)
+{tailored_text or '(not yet tailored)'}
+
+Answer the user's question using ONLY the facts above. Cite specific
+experiences or projects when relevant. If asked about something not in
+your facts, say it's not in the Master CV."""
+
+        router = _router()
+        try:
+            response = router.complete(prompt=user_prompt, system=system_prompt)
+            answer = response.text
+        except LLMUnavailable:
+            answer = (
+                "I can't reach the LLM right now. Please check your API key "
+                "in Settings, or try again in a moment."
+            )
+
+        # Save assistant message
+        if app_id:
+            store.add_copilot_message(app_id, "assistant", answer)
+
+        return JSONResponse({"reply": answer})
+    finally:
+        store.close()
+
+
+@app.get("/api/copilot/history/{app_id}")
+def copilot_history(app_id: int) -> JSONResponse:
+    """Chat history for an application."""
+    store = _store()
+    try:
+        return JSONResponse(store.get_copilot_history(app_id))
+    finally:
+        store.close()

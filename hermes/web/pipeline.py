@@ -152,6 +152,35 @@ def score_keywords_for(keywords: dict) -> list[str]:
     )
 
 
+def category_breakdown(resume_text: str, keywords: dict) -> dict[str, dict]:
+    """Per-category keyword match: for each category, which keywords
+    matched and which are missing, plus a coverage percentage.
+
+    Returns:
+        {
+            "hard_skills": {"matched": [...], "missing": [...], "coverage": 0.75},
+            "tools": {...},
+            "soft_skills": {...},
+            ...
+        }
+    """
+    from hermes.utils.skill_match import skill_coverage
+
+    result = {}
+    for category in ("hard_skills", "tools", "soft_skills", "certifications", "domain_keywords"):
+        items = keywords.get(category, [])
+        if not items:
+            result[category] = {"matched": [], "missing": [], "coverage": 1.0}
+            continue
+        coverage, matched, missing = skill_coverage(items, resume_text)
+        result[category] = {
+            "matched": matched,
+            "missing": missing,
+            "coverage": round(coverage * 100, 1),
+        }
+    return result
+
+
 def tailor(
     resume: dict,
     jd: dict,

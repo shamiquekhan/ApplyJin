@@ -57,12 +57,19 @@ export interface Scores {
   missing_keywords?: string[];
 }
 
+export interface CategoryBreakdown {
+  matched: string[];
+  missing: string[];
+  coverage: number; // 0-100
+}
+
 export interface FitBreakdown {
   keyword_match: number;
   semantic_similarity: number;
   overall: number;
   matched_keywords: string[];
   missing_keywords: string[];
+  categories?: Record<string, CategoryBreakdown>;
 }
 
 export interface TailorResult {
@@ -275,3 +282,23 @@ export const updateLLMSettings = (chain: { provider: string; model: string; api_
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chain }),
   }).then((r) => handle<{ ok: boolean; chain: LLMProvider[] }>(r));
+
+// -------- copilot chat
+
+export interface CopilotMessage {
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}
+
+export const copilotChat = (message: string, applicationId?: number) =>
+  fetch(`${API_BASE}/api/copilot/chat`, {
+    ...authHeader(),
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, application_id: applicationId }),
+  }).then((r) => handle<{ reply: string }>(r));
+
+export const getCopilotHistory = (appId: number) =>
+  fetch(`${API_BASE}/api/copilot/history/${appId}`, { headers: authHeader() })
+    .then((r) => handle<CopilotMessage[]>(r));

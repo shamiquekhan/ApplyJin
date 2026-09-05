@@ -57,6 +57,13 @@ CREATE TABLE IF NOT EXISTS waitlist (
     source TEXT DEFAULT '',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS copilot_messages (
+    id INTEGER PRIMARY KEY,
+    application_id INTEGER,
+    role TEXT CHECK(role IN ('user', 'assistant')),
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 # Column additions for stores created before the master-DB era.
@@ -282,3 +289,21 @@ class WebStore:
     def waitlist_count(self) -> int:
         row = self.conn.execute("SELECT COUNT(*) c FROM waitlist").fetchone()
         return row["c"]
+
+    # ---------------------------------------------------------- copilot
+
+    def add_copilot_message(self, application_id: int, role: str, content: str) -> int:
+        cur = self.conn.execute(
+            "INSERT INTO copilot_messages (application_id, role, content) VALUES (?, ?, ?)",
+            (application_id, role, content),
+        )
+        self.conn.commit()
+        return cur.lastrowid
+
+    def get_copilot_history(self, application_id: int, limit: int = 50) -> list[dict]:
+        rows = self.conn.execute(
+            "SELECT role, content, created_at FROM copilot_messages "
+            "WHERE application_id = ? ORDER BY id DESC LIMIT ?",
+            (application_id, limit),
+        ).fetchall()
+        return [dict(r) for r in reversed(rows)]

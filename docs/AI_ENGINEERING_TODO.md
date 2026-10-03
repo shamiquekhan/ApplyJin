@@ -57,6 +57,7 @@ ordinary CLI use or tests.
 - [x] Add hybrid lexical plus dense retrieval ranking with offline fallback
 - [ ] Expand typed verification to companies, titles, skills, and certifications
 - [ ] Add token usage, TTFT, TPOT, queue, retry, and provider telemetry
+- [x] Add provider generation telemetry for latency, TTFT/TPOT, tokens, and failures
 - [ ] Add stratified A/B analysis by job family, seniority, board, and fit
 
 ## Model Operations

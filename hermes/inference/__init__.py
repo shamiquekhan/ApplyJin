@@ -17,7 +17,7 @@ from hermes.inference.vllm_client import VLLMProvider
 from hermes.inference.context import ContextPackage, build_context, estimate_tokens
 from hermes.inference.router import ModelCandidate, RoutingWeights, choose_model, order_candidates, utility
 from hermes.inference.reliability import CircuitBreaker, CircuitOpen, call_with_retry
-from hermes.inference.metrics import DECISION_METRICS, RuntimeMetrics
+from hermes.inference.metrics import DECISION_METRICS, INFERENCE_METRICS, GenerationObservation, RuntimeMetrics
 from hermes.inference.verification import ClaimReference, classify_claim, extract_claims, verify_claims
 from hermes.inference.metrics_store import MetricsStore
 from hermes.inference.failures import FailureCode, classify_failure
@@ -71,6 +71,8 @@ __all__ = [
     "call_with_retry",
     "RuntimeMetrics",
     "DECISION_METRICS",
+    "INFERENCE_METRICS",
+    "GenerationObservation",
     "ClaimReference",
     "extract_claims",
     "classify_claim",

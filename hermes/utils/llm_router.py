@@ -15,14 +15,18 @@ from __future__ import annotations
 import json
 import logging
 import re
+import threading
 import time
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
 from hermes.config import LLMConfig, RetrySettings
 from hermes.models import LLMResponse
+from hermes.inference.llm import run_provider
+from hermes.inference.litellm_client import LiteLLMProvider
 from hermes.inference.router import ModelCandidate, RoutingWeights, order_candidates
 from hermes.inference.model_registry import ModelRegistry
+from hermes.inference.vllm_client import VLLMProvider
 
 logger = logging.getLogger("hermes.llm")
 
@@ -71,6 +75,8 @@ class LLMRouter:
         self._litellm = None
         self._last_call: dict[str, datetime] = {}   # provider -> last call time
         self._min_interval = _DEFAULT_MIN_INTERVAL
+        self._adapters: dict[tuple, Any] = {}
+        self._adapter_lock = threading.Lock()
 
     @property
     def available(self) -> bool:
@@ -147,6 +153,53 @@ class LLMRouter:
             self._litellm = litellm
         return self._litellm
 
+    def _litellm_adapter(self, provider: dict[str, str], timeout_seconds: float) -> LiteLLMProvider:
+        return LiteLLMProvider(
+            model=provider["model"],
+            api_key=provider.get("api_key", ""),
+            api_base=provider.get("api_base"),
+            timeout=timeout_seconds,
+            provider_name=provider.get("provider", "litellm"),
+            completion=lambda **kwargs: self._litellm_completion().completion(**kwargs),
+        )
+
+    def _adapter_for(self, provider: dict[str, str], timeout_seconds: float) -> Any:
+        """Canonical ``LLMProvider`` for one chain entry, cached per entry."""
+        key = (
+            provider.get("provider", ""),
+            provider.get("model", ""),
+            provider.get("api_key", ""),
+            provider.get("api_base"),
+            timeout_seconds,
+        )
+        with self._adapter_lock:
+            adapter = self._adapters.get(key)
+            if adapter is not None:
+                return adapter
+            if provider.get("provider") == "vllm":
+                adapter = self._vllm_adapter(provider, timeout_seconds)
+            else:
+                adapter = self._litellm_adapter(provider, timeout_seconds)
+            self._adapters[key] = adapter
+            return adapter
+
+    def _vllm_adapter(self, provider: dict[str, str], timeout_seconds: float) -> Any:
+        try:
+            return VLLMProvider(
+                base_url=provider.get("api_base"),
+                # vLLM expects the bare model name; LiteLLM strips the
+                # ``openai/`` routing prefix itself, the OpenAI client does not.
+                model=provider["model"].removeprefix("openai/"),
+                api_key=provider.get("api_key") or "local",
+                timeout=timeout_seconds,
+            )
+        except Exception as exc:  # noqa: BLE001 — missing optional deps etc.
+            logger.debug(
+                "vLLM provider unavailable for %s (%s) — falling back to LiteLLM",
+                provider["model"], exc,
+            )
+            return self._litellm_adapter(provider, timeout_seconds)
+
     def complete(
         self,
         prompt: str,
@@ -209,26 +262,17 @@ class LLMRouter:
                     break
                 try:
                     self._throttle(model)
-                    kwargs: dict[str, Any] = {
-                        "model": model,
-                        "messages": (
-                            [{"role": "system", "content": system}]
-                            if system
-                            else []
+                    messages = (
+                        [{"role": "system", "content": system}] if system else []
+                    ) + [{"role": "user", "content": prompt}]
+                    adapter = self._adapter_for(provider, gen.timeout_seconds)
+                    text = run_provider(
+                        adapter.generate(
+                            messages,
+                            temperature=gen.temperature,
+                            max_tokens=gen.max_tokens,
                         )
-                        + [{"role": "user", "content": prompt}],
-                        "temperature": gen.temperature,
-                        "max_tokens": gen.max_tokens,
-                        "timeout": gen.timeout_seconds,
-                    }
-                    if "api_base" in provider:
-                        kwargs["api_base"] = provider["api_base"]
-                        kwargs["api_key"] = provider.get("api_key", "ollama")
-                    else:
-                        kwargs["api_key"] = provider["api_key"]
-
-                    response = self._litellm_completion().completion(**kwargs)
-                    text = response["choices"][0]["message"]["content"] or ""
+                    )
                     return LLMResponse(
                         text=text,
                         model=model,

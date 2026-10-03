@@ -49,7 +49,7 @@ ordinary CLI use or tests.
 - [x] Fail-closed decision handling and deterministic-fit ownership
 - [x] Token-aware context integration in resume generation
 - [x] Typed verification for generated metrics and dates
-- [ ] Consolidate LiteLLM and vLLM behind the canonical `LLMProvider`
+- [x] Consolidate LiteLLM and vLLM behind the canonical `LLMProvider`
 - [x] Add a canonical `LLMProvider` bridge for the existing LiteLLM router
 - [ ] Replace hard-coded routing estimates with measured model-registry data
 - [x] Add measured model-registry support with conservative unmeasured defaults

@@ -1,6 +1,6 @@
 import asyncio
 
-from hermes.inference.litellm_client import LiteLLMProvider
+from hermes.inference.litellm_client import RouterProvider
 from hermes.models import LLMResponse
 
 
@@ -9,8 +9,8 @@ class _Router:
         return LLMResponse(text=f"{system}:{prompt}", model="test", provider="test")
 
 
-def test_litellm_bridge_implements_async_provider_contract():
-    provider = LiteLLMProvider(_Router())
+def test_router_bridge_implements_async_provider_contract():
+    provider = RouterProvider(_Router())
     messages = [
         {"role": "system", "content": "system"},
         {"role": "user", "content": "prompt"},

@@ -12,7 +12,7 @@ from hermes.inference.agent import DecisionAgent
 from hermes.inference.base import DecisionProvider, ProviderUnavailable
 from hermes.inference.heuristic_provider import HeuristicDecisionProvider
 from hermes.inference.laya_client import LayaDecisionProvider
-from hermes.inference.llm import LLMProvider
+from hermes.inference.llm import LLMProvider, run_provider
 from hermes.inference.vllm_client import VLLMProvider
 from hermes.inference.context import ContextPackage, build_context, estimate_tokens
 from hermes.inference.router import ModelCandidate, RoutingWeights, choose_model, order_candidates, utility
@@ -22,7 +22,7 @@ from hermes.inference.verification import ClaimReference, classify_claim, extrac
 from hermes.inference.metrics_store import MetricsStore
 from hermes.inference.failures import FailureCode, classify_failure
 from hermes.inference.model_registry import ModelRegistry
-from hermes.inference.litellm_client import LiteLLMProvider
+from hermes.inference.litellm_client import LiteLLMProvider, RouterProvider
 from hermes.inference.policies import (
     APPLICATION_POLICY_VERSION,
     DEFAULT_THRESHOLDS,
@@ -57,6 +57,7 @@ __all__ = [
     "REVIEW",
     "SKIP",
     "LLMProvider",
+    "run_provider",
     "VLLMProvider",
     "ContextPackage",
     "build_context",
@@ -82,6 +83,7 @@ __all__ = [
     "classify_failure",
     "ModelRegistry",
     "LiteLLMProvider",
+    "RouterProvider",
     "DecisionQuestion",
     "DecisionRequest",
     "DecisionResult",

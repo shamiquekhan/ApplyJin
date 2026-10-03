@@ -53,6 +53,8 @@ def _questions_for_laya(request: DecisionRequest) -> dict[str, dict[str, Any]]:
             "type": q.type,
             "instructions": q.instructions,
         }
+        if q.labels:
+            entry["labels"] = dict(q.labels)
         if q.type == "choice":
             if q.criteria:
                 entry["criteria"] = dict(q.criteria)

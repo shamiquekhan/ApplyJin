@@ -29,6 +29,8 @@ class DecisionQuestion(BaseModel):
     criteria: dict[str, str] = Field(default_factory=dict)
     # score bounds; ignored for choice/noul.
     scale: tuple[int, int] = (0, 5)
+    labels: dict[str, str] = Field(default_factory=dict)
+    min_confidence: float | None = None
 
 
 class DecisionRequest(BaseModel):

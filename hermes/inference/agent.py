@@ -113,20 +113,15 @@ class DecisionAgent:
     # --------------------------------------------------------- questions
 
     @staticmethod
-    def build_questions(include_injection: bool = True) -> dict[str, DecisionQuestion]:
+    def build_questions(
+        include_injection: bool = True,
+        include_fit: bool = True,
+    ) -> dict[str, DecisionQuestion]:
         questions = {
             "job_type": DecisionQuestion(
                 type="choice",
                 instructions="Classify the job into the closest category.",
                 criteria=JOB_TYPE_LABELS,
-            ),
-            "technical_fit": DecisionQuestion(
-                type="score",
-                instructions=(
-                    "Score how strongly the candidate's technical "
-                    "background matches the job requirements."
-                ),
-                criteria=SCORE_CRITERIA,
             ),
             "meets_core_requirements": DecisionQuestion(
                 type="noul",
@@ -136,6 +131,15 @@ class DecisionAgent:
                 ),
             ),
         }
+        if include_fit:
+            questions["technical_fit"] = DecisionQuestion(
+                type="score",
+                instructions=(
+                    "Score how strongly the candidate's technical "
+                    "background matches the job requirements."
+                ),
+                criteria=SCORE_CRITERIA,
+            )
         if include_injection:
             questions["prompt_injection"] = DecisionQuestion(
                 type="noul",
@@ -155,6 +159,7 @@ class DecisionAgent:
         job_id: str = "",
         stage: str = "gate",
         apply_policy: bool = True,
+        deterministic_fit: float | None = None,
     ) -> tuple[PolicyOutcome, DecisionTrace]:
         """Run provider -> policy -> trace. Never raises: provider failure
         degrades to heuristics and the trace records it."""
@@ -162,16 +167,32 @@ class DecisionAgent:
         request = DecisionRequest(
             state=state,
             questions=self.build_questions(
-                include_injection=stage in ("gate", "injection")
+                include_injection=stage in ("gate", "injection"),
+                include_fit=deterministic_fit is None,
             ),
         )
 
         result, fallback_used, error = self._decide_with_fallback(request)
         outcome = (
-            self._policy_from(result)
+            self._policy_from(result, deterministic_fit=deterministic_fit)
             if apply_policy
             else PolicyOutcome(action="NONE")
         )
+        low_confidence = [
+            name
+            for name, question in request.questions.items()
+            if question.min_confidence is not None
+            and result.answers.get(name) is not None
+            and result.answers[name].confidence < question.min_confidence
+        ]
+        if low_confidence and apply_policy:
+            outcome = PolicyOutcome(
+                action="REVIEW",
+                reasons=[
+                    "decision confidence below threshold: "
+                    + ", ".join(low_confidence)
+                ],
+            )
 
         trace = DecisionTrace(
             decision_id=uuid.uuid4().hex[:16],
@@ -226,10 +247,16 @@ class DecisionAgent:
 
             return DecisionResult(model="none", backend="none"), True, str(exc)
 
-    def _policy_from(self, result: DecisionResult) -> PolicyOutcome:
+    def _policy_from(
+        self, result: DecisionResult, deterministic_fit: float | None = None
+    ) -> PolicyOutcome:
         answers = result.answers
         fit_ans = answers.get("technical_fit")
-        fit = float(fit_ans.value) if fit_ans and fit_ans.value else 0.0
+        fit = (
+            deterministic_fit
+            if deterministic_fit is not None
+            else float(fit_ans.value) if fit_ans and fit_ans.value else 0.0
+        )
         req_ans = answers.get("meets_core_requirements")
         req = float(req_ans.probability) if req_ans and req_ans.probability is not None else 0.0
         inj_ans = answers.get("prompt_injection")

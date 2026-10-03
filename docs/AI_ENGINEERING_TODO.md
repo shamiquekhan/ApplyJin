@@ -28,6 +28,10 @@ ordinary CLI use or tests.
 - [x] Fail-closed decision fallback routes unavailable policy to human review
 - [x] Token-aware context budgeting wired into resume generation
 - [x] Normalize routing utility terms before provider selection
+- [x] Freeze reproducible baseline metadata and measured reports
+- [x] Add typed decision labels and minimum-confidence review gates
+- [x] Keep deterministic fit scoring primary while Laya handles bounded decisions
+- [x] Add typed metric/date checks to claim verification
 - [x] Declare vLLM in the optional local-inference dependency set
 - [x] Run initial Qwen 0.5B vLLM measurements on the GTX 1650
 - [x] Add executable FP16 versus NF4 4-bit comparison command
@@ -39,6 +43,18 @@ ordinary CLI use or tests.
 
 - [ ] Expand the evaluation dataset with larger labelled and adversarial sets
 - [x] Export Prometheus metrics through the web application endpoint
+
+## Audit Follow-Ups
+
+- [x] Fail-closed decision handling and deterministic-fit ownership
+- [x] Token-aware context integration in resume generation
+- [x] Typed verification for generated metrics and dates
+- [ ] Consolidate LiteLLM and vLLM behind the canonical `LLMProvider`
+- [ ] Replace hard-coded routing estimates with measured model-registry data
+- [ ] Add hybrid BM25 plus dense retrieval and reranking
+- [ ] Expand typed verification to companies, titles, skills, and certifications
+- [ ] Add token usage, TTFT, TPOT, queue, retry, and provider telemetry
+- [ ] Add stratified A/B analysis by job family, seniority, board, and fit
 
 ## Model Operations
 

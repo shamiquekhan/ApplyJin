@@ -1,4 +1,4 @@
-from hermes.inference.verification import extract_claims, verify_claims
+from hermes.inference.verification import classify_claim, extract_claims, verify_claims
 
 
 def test_claims_are_extracted_from_bullets_not_headings():
@@ -15,3 +15,13 @@ def test_claims_receive_evidence_references_or_are_marked_unsupported():
     assert references[0].supported is True
     assert references[0].evidence_id == "b1"
     assert references[1].supported is False
+
+
+def test_metrics_and_dates_require_exact_evidence_values():
+    assert classify_claim("Reduced latency by 72% in 2025") == "METRIC"
+    references = verify_claims(
+        "- Built FastAPI services with 72% lower latency in 2025",
+        [("b1", "Built FastAPI services with 42% lower latency in 2024")],
+    )
+    assert references[0].supported is False
+    assert references[0].claim_type == "METRIC"

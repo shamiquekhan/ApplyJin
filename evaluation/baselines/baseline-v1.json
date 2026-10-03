@@ -1,0 +1,22 @@
+{
+  "git_sha": "320bd6fa4fe32fa6a92ed90cb19a15fb3ddb4571",
+  "python": "3.13.9",
+  "os": "Linux",
+  "cuda": "CUDA-enabled PyTorch environment",
+  "gpu": "NVIDIA GeForce GTX 1650, 4096 MiB",
+  "laya": "0.3.24",
+  "vllm": "0.30.0",
+  "model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "retrieval": "ChromaDB or deterministic local fallback",
+  "prompt_version": "repository prompts at baseline SHA",
+  "policy_version": "application_policy_v1",
+  "metrics": {
+    "evaluation_cases": 7,
+    "evaluation_correctness": 1.0,
+    "vllm_concurrency_1_tokens_per_second": 34.02,
+    "vllm_concurrency_2_tokens_per_second": 9.83,
+    "fp16_peak_gpu_memory_mb": 953.7,
+    "nf4_peak_gpu_memory_mb": 452.46,
+    "qlora_heldout_loss_delta": -0.0576
+  }
+}

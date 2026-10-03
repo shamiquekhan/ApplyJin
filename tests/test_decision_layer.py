@@ -184,6 +184,15 @@ class TestPolicy:
 
 
 class TestDecisionAgent:
+    def test_min_confidence_routes_to_review(self, tmp_path):
+        question = DecisionQuestion(
+            type="noul", instructions="Is this safe?", min_confidence=0.95
+        )
+        stub = _StubProvider()
+        agent = DecisionAgent(provider=stub, traces_path=tmp_path / "trace.jsonl")
+        agent.build_questions = lambda include_injection=True, include_fit=True: {"safe": question}
+        outcome, _ = agent.decide("state", job_id="confidence")
+        assert outcome.action == REVIEW
     def test_batched_request_hits_provider_once(self):
         stub = _StubProvider()
         agent = DecisionAgent(provider=stub, traces_path=None)

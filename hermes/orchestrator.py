@@ -178,7 +178,7 @@ class Orchestrator:
 
         # Decision layer: batched typed decisions (classification, fit,
         # core-requirements, prompt-injection) -> deterministic policy.
-        decision_outcome, trace = self._decide(job, analysis)
+        decision_outcome, trace = self._decide(job, analysis, scored.fit_score)
         if decision_outcome.action == "SKIP":
             reason = "; ".join(decision_outcome.reasons) or "policy skip"
             result.skipped.append(f"{tag}: decision layer skip — {reason}")
@@ -249,7 +249,7 @@ class Orchestrator:
             logger.info("Queued for review: %s (fit=%.2f, ATS %.2f->%.2f)",
                         tag, scored.fit_score, ats_before, ats_after)
 
-    def _decide(self, job: JobPosting, analysis) -> tuple:
+    def _decide(self, job: JobPosting, analysis, deterministic_fit: float | None = None) -> tuple:
         """Run the decision layer for one job. Never raises."""
         try:
             from hermes.inference.agent import DecisionAgent
@@ -273,7 +273,10 @@ class Orchestrator:
                 },
             )
             outcome, trace = self.decision_agent.decide(
-                state, job_id=job.job_id, stage="gate"
+                state,
+                job_id=job.job_id,
+                stage="gate",
+                deterministic_fit=deterministic_fit,
             )
             backend = trace.backend or "heuristic"
             logger.info(

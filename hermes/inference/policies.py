@@ -37,6 +37,9 @@ class PolicyThresholds:
     # P(requirements) between these two: REVIEW band.
     review_band_low: float = 0.70
     review_band_high: float = 0.85
+    # Below this decision-model confidence: uncertain answers need review.
+    min_decision_confidence: float = 0.60
+
 
 
 DEFAULT_THRESHOLDS = PolicyThresholds()
@@ -56,11 +59,15 @@ def application_policy(
     requirement_probability: float,
     injection_probability: float = 0.0,
     thresholds: PolicyThresholds = DEFAULT_THRESHOLDS,
+    *,
+    confidence: float = 1.0,
 ) -> PolicyOutcome:
     """Gate an application decision on typed decision outputs.
 
-    Order matters: injection -> hard skip, fit -> skip, uncertainty
-    -> review, else generate.
+    Order matters: injection -> hard skip, fit -> skip, low decision
+    confidence -> review, uncertainty -> review, else generate. ``confidence``
+    is the provider's self-reported decision confidence; providers that do
+    not report one pass the default (no signal, no gate).
     """
     outcome = PolicyOutcome(action=GENERATE)
     t = thresholds
@@ -77,6 +84,13 @@ def application_policy(
         outcome.action = SKIP
         outcome.reasons.append(
             f"technical fit {technical_fit:.1f} < {t.min_fit_score:.1f}"
+        )
+        return outcome
+
+    if confidence < t.min_decision_confidence:
+        outcome.action = REVIEW
+        outcome.reasons.append(
+            f"decision confidence {confidence:.2f} < {t.min_decision_confidence:.2f}"
         )
         return outcome
 
@@ -100,6 +114,20 @@ def application_policy(
     return outcome
 
 
+def confidence_from_answers(answers: dict) -> float:
+    """Weakest reported answer confidence; 1.0 when the provider reports none.
+
+    Zero means "not reported" (heuristic provider, providers without
+    confidence fields), so it never triggers the confidence gate.
+    """
+    reported = [
+        float(answer.confidence)
+        for answer in answers.values()
+        if getattr(answer, "confidence", 0.0) and float(answer.confidence) > 0
+    ]
+    return min(reported) if reported else 1.0
+
+
 def outcome_from_result(
     result: DecisionResult,
     thresholds: PolicyThresholds = DEFAULT_THRESHOLDS,
@@ -121,4 +149,6 @@ def outcome_from_result(
     req = _prob("meets_core_requirements", 0.0)
     inj = _prob("prompt_injection", 0.0)
 
-    return application_policy(fit, req, inj, thresholds)
+    return application_policy(
+        fit, req, inj, thresholds, confidence=confidence_from_answers(answers)
+    )

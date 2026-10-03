@@ -15,6 +15,7 @@ from hermes.inference.laya_client import LayaDecisionProvider
 from hermes.inference.llm import LLMProvider, run_provider
 from hermes.inference.vllm_client import VLLMProvider
 from hermes.inference.context import ContextPackage, build_context, estimate_tokens
+from hermes.inference.tokens import ApproximateTokenCounter, TokenCounter, counter_for_model
 from hermes.inference.router import ModelCandidate, RoutingWeights, choose_model, order_candidates, utility
 from hermes.inference.reliability import CircuitBreaker, CircuitOpen, call_with_retry
 from hermes.inference.metrics import DECISION_METRICS, INFERENCE_METRICS, GenerationObservation, RuntimeMetrics
@@ -32,6 +33,8 @@ from hermes.inference.policies import (
     REVIEW,
     SKIP,
     application_policy,
+    confidence_from_answers,
+    outcome_from_result,
 )
 from hermes.inference.schemas import (
     DecisionAnswer,
@@ -49,6 +52,8 @@ __all__ = [
     "HeuristicDecisionProvider",
     "DecisionAgent",
     "application_policy",
+    "confidence_from_answers",
+    "outcome_from_result",
     "PolicyOutcome",
     "PolicyThresholds",
     "DEFAULT_THRESHOLDS",
@@ -62,6 +67,9 @@ __all__ = [
     "ContextPackage",
     "build_context",
     "estimate_tokens",
+    "TokenCounter",
+    "ApproximateTokenCounter",
+    "counter_for_model",
     "ModelCandidate",
     "RoutingWeights",
     "choose_model",

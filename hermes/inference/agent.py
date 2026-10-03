@@ -30,6 +30,7 @@ from hermes.inference.policies import (
     PolicyOutcome,
     PolicyThresholds,
     application_policy,
+    confidence_from_answers,
 )
 from hermes.inference.schemas import (
     DecisionQuestion,
@@ -261,7 +262,13 @@ class DecisionAgent:
         req = float(req_ans.probability) if req_ans and req_ans.probability is not None else 0.0
         inj_ans = answers.get("prompt_injection")
         inj = float(inj_ans.probability) if inj_ans and inj_ans.probability is not None else 0.0
-        return application_policy(fit, req, inj, self.thresholds)
+        return application_policy(
+            fit,
+            req,
+            inj,
+            self.thresholds,
+            confidence=confidence_from_answers(answers),
+        )
 
     # ------------------------------------------------------------ traces
 

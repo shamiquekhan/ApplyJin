@@ -17,13 +17,16 @@
 
 ---
 
-ApplyJin (built on the **Hermes** engine) is a fully open-source, self-learning
+ApplyJin (built on the **Hermes** engine) is a source-available, self-learning
 multi-agent system that automates the job application pipeline — from discovery
 to tailored, ATS-optimized application packets — while keeping a human in the
-loop for every submit decision.
+loop for every submit decision. It is licensed CC BY-NC 4.0 (non-commercial;
+a separate license is required for commercial use).
 
-It runs entirely on your machine with **zero subscription costs**, using free
-LLM tiers (Gemini), local embeddings, and open-source libraries.
+In **local mode** it runs on your machine with **zero subscription costs**,
+using free LLM tiers (Gemini), local embeddings, and open-source libraries.
+A **demo mode** deploys the frontend and backend separately; a **research
+mode** swaps the generation backend for a local vLLM server.
 
 ---
 
@@ -335,7 +338,15 @@ watch the A/B verdicts in the Console.
 
 ## Deployment (free)
 
-The split deployment: **frontend on Vercel**, **backend on Render**.
+### Deployment modes
+
+| Mode | Stack | Used for |
+|---|---|---|
+| **Local** | SQLite, ChromaDB, Laya, Gemini free tier / Ollama / vLLM | daily use, privacy |
+| **Demo** | Vercel frontend → Render backend → Gemini API | public demo |
+| **Research** | ApplyJin → vLLM on a CUDA GPU | benchmarking, quantization, routing experiments |
+
+The split demo deployment: **frontend on Vercel**, **backend on Render**.
 
 ### Backend → Render (Docker)
 

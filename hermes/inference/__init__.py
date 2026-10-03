@@ -14,7 +14,7 @@ from hermes.inference.heuristic_provider import HeuristicDecisionProvider
 from hermes.inference.laya_client import LayaDecisionProvider
 from hermes.inference.llm import LLMProvider
 from hermes.inference.vllm_client import VLLMProvider
-from hermes.inference.context import ContextPackage, build_context
+from hermes.inference.context import ContextPackage, build_context, estimate_tokens
 from hermes.inference.router import ModelCandidate, RoutingWeights, choose_model, order_candidates, utility
 from hermes.inference.reliability import CircuitBreaker, CircuitOpen, call_with_retry
 from hermes.inference.metrics import DECISION_METRICS, RuntimeMetrics
@@ -58,6 +58,7 @@ __all__ = [
     "VLLMProvider",
     "ContextPackage",
     "build_context",
+    "estimate_tokens",
     "ModelCandidate",
     "RoutingWeights",
     "choose_model",

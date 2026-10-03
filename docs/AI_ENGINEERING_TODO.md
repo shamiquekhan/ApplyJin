@@ -25,6 +25,9 @@ ordinary CLI use or tests.
 - [x] Expose hashed decision traces for human review
 - [x] Benchmark matrix and quantization quality-gate framework
 - [x] Deterministic held-out dataset split for model experiments
+- [x] Fail-closed decision fallback routes unavailable policy to human review
+- [x] Token-aware context budgeting wired into resume generation
+- [x] Normalize routing utility terms before provider selection
 - [x] Declare vLLM in the optional local-inference dependency set
 - [x] Run initial Qwen 0.5B vLLM measurements on the GTX 1650
 - [x] Add executable FP16 versus NF4 4-bit comparison command

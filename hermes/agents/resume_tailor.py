@@ -19,6 +19,7 @@ from hermes.utils.embeddings import cosine_similarity, get_embeddings
 from hermes.utils.experience_library import ExperienceLibrary
 from hermes.utils.llm_router import LLMRouter, LLMUnavailable
 from hermes.inference.verification import verify_claims
+from hermes.inference.context import build_context
 
 logger = logging.getLogger("hermes.tailor")
 
@@ -182,15 +183,16 @@ class ResumeTailor:
                 model_used="none-base-resume",
             )
 
+        context = build_context(
+            job=job.description,
+            evidence=relevant,
+            instructions=self._guide_for(variant),
+        )
         prompt = self._prompt_template.format(
             style_guide=self._guide_for(variant),
             required_skills=", ".join(analysis.required_skills) or "n/a",
             must_have_keywords=", ".join(analysis.must_have_keywords) or "n/a",
-            relevant_bullets=(
-                "<VERIFIED_CANDIDATE_EVIDENCE>\n"
-                + ("\n".join(f"- {b}" for b in relevant) or "n/a")
-                + "\n</VERIFIED_CANDIDATE_EVIDENCE>"
-            ),
+            relevant_bullets=context.as_prompt(),
             base_resume=(
                 "<UNTRUSTED_UPLOADED_RESUME>\n"
                 + resume.raw_text[:6000]
@@ -202,7 +204,7 @@ class ResumeTailor:
             response = self.router.complete(
                 prompt=prompt,
                 task="resume_generation",
-                context_length=len(prompt),
+                context_length=context.input_tokens,
             )
         except LLMUnavailable as exc:
             logger.warning(

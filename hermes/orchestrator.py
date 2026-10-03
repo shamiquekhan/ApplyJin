@@ -289,33 +289,41 @@ class Orchestrator:
             )
             return outcome, trace
         except Exception as exc:  # noqa: BLE001 — decision never breaks pipeline
-            logger.warning("Decision layer failed (%s) — continuing", exc)
-            from hermes.inference.policies import GENERATE, PolicyOutcome
-
-            return (
-                PolicyOutcome(action=GENERATE, reasons=["decision layer unavailable"]),
-                None,
-            )
+            logger.warning("Decision layer failed (%s) — routing to review", exc)
+            return _decision_failure_outcome(exc), None
 
 
 def _build_decision_agent():
     """Build a DecisionAgent honoring LAYA_MODEL / LAYA_DEVICE env config.
 
-    Returns None on construction failure so the pipeline keeps running
-    without the decision layer rather than crashing.
+    Falls back to the deterministic provider so a decision failure cannot
+    silently become an automatic generation decision.
     """
     try:
         from hermes.inference.agent import DecisionAgent
 
         return DecisionAgent()
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Decision layer unavailable: %s", exc)
-        return None
+        logger.warning("Decision layer unavailable (%s) — using heuristic fallback", exc)
+        from hermes.inference.agent import DecisionAgent
+        from hermes.inference.heuristic_provider import HeuristicDecisionProvider
+
+        return DecisionAgent(provider=HeuristicDecisionProvider())
 
 
 def _verification_failure_reason(violations: list[str]) -> str:
     """Format verifier output for the blocked application review record."""
     return "; ".join(violations) or "verification failed"
+
+
+def _decision_failure_outcome(error: Exception):
+    """Route unavailable decision infrastructure to human review."""
+    from hermes.inference.policies import PolicyOutcome, REVIEW
+
+    return PolicyOutcome(
+        action=REVIEW,
+        reasons=[f"decision layer unavailable: {type(error).__name__}"],
+    )
 
 
 def _dedupe_by_id(jobs: list[JobPosting]) -> list[JobPosting]:

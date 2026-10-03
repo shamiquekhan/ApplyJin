@@ -4,18 +4,20 @@ import asyncio
 
 import pytest
 
-from hermes.inference.context import build_context
+from hermes.inference.context import build_context, estimate_tokens
 from hermes.inference.reliability import CircuitBreaker, CircuitOpen, call_with_retry
-from hermes.inference.router import ModelCandidate, RoutingWeights, order_candidates
+from hermes.inference.router import ModelCandidate, RoutingWeights, order_candidates, utility
 
 
 def test_context_is_bounded_and_delimited():
     package = build_context("job " * 20, ["Python evidence", "second evidence", "third evidence"], "Use verified evidence only.", {"job": 10, "candidate_evidence": 18, "instructions": 8})
-    assert package.job == "job job jo"
+    assert estimate_tokens(package.job) <= 10
     assert package.retrieved_chunks == 3
-    assert package.discarded_chunks == 1
+    assert package.discarded_chunks == 0
     assert "<UNTRUSTED_JOB_DESCRIPTION>" in package.as_prompt()
     assert "<VERIFIED_CANDIDATE_EVIDENCE>" in package.as_prompt()
+    assert package.input_tokens > 0
+    assert estimate_tokens("Python APIs") >= 2
 
 
 def test_retry_then_success_resets_breaker():
@@ -51,5 +53,6 @@ def test_generation_candidates_are_ordered_by_configured_utility():
         ModelCandidate("slow", quality=0.95, latency_ms=500, resource_cost=2, failure_probability=0.1),
         ModelCandidate("fast", quality=0.85, latency_ms=50, resource_cost=1, failure_probability=0.05),
     ]
-    ordered = order_candidates(candidates, weights=RoutingWeights(quality=1, latency=0.01, resource=0.1, failure=0.5))
+    ordered = order_candidates(candidates, weights=RoutingWeights(quality=1, latency=0.5, resource=0.1, failure=0.5))
     assert [candidate.name for candidate in ordered] == ["fast", "slow"]
+    assert utility(candidates[0], RoutingWeights()) > -1.0

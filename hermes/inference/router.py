@@ -38,15 +38,29 @@ class ModelCandidate:
     resource_cost: float
     failure_probability: float
     max_context: int = 8192
+    latency_budget_ms: float = 1000.0
+    resource_budget: float = 10.0
+
+    @staticmethod
+    def _bounded(value: float) -> float:
+        return min(1.0, max(0.0, value))
+
+    @property
+    def latency_score(self) -> float:
+        return self._bounded(self.latency_ms / self.latency_budget_ms)
+
+    @property
+    def resource_score(self) -> float:
+        return self._bounded(self.resource_cost / self.resource_budget)
 
 
 def utility(candidate: ModelCandidate, weights: RoutingWeights = RoutingWeights()) -> float:
     """Return the configured utility score used for model selection."""
     return (
-        weights.quality * candidate.quality
-        - weights.latency * candidate.latency_ms
-        - weights.resource * candidate.resource_cost
-        - weights.failure * candidate.failure_probability
+        weights.quality * candidate._bounded(candidate.quality)
+        - weights.latency * candidate.latency_score
+        - weights.resource * candidate.resource_score
+        - weights.failure * candidate._bounded(candidate.failure_probability)
     )
 
 

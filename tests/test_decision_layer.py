@@ -21,6 +21,8 @@ from hermes.inference.schemas import (
     DecisionTrace,
     state_hash,
 )
+from hermes.inference.policies import REVIEW
+from hermes.orchestrator import _decision_failure_outcome
 
 
 def _questions():
@@ -266,6 +268,10 @@ class TestStateHash:
 
     def test_differs(self):
         assert state_hash("abc") != state_hash("abd")
+
+    def test_orchestrator_decision_failure_requires_review(self):
+        outcome = _decision_failure_outcome(RuntimeError("provider down"))
+        assert outcome.action == REVIEW
 
 
 class TestVLLMRouterEntry:

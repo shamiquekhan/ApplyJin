@@ -112,7 +112,7 @@ class LLMRouter:
                     {
                         "provider": "vllm",
                         "model": entry.model,
-                        "api_base": entry.api_base or "http://localhost:8000/v1",
+                        "api_base": entry.api_base or "http://localhost:8001/v1",
                         "api_key": entry.api_key or "local",
                     }
                 )

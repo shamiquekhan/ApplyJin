@@ -25,7 +25,12 @@ class ModelRegistry:
         return cls(json.loads(registry_path.read_text(encoding="utf-8")))
 
     def profile(self, model: str) -> dict[str, Any]:
-        return dict(self.profiles.get(model, {}))
+        profile = self.profiles.get(model)
+        if profile is None and model.startswith("openai/"):
+            # Chain entries carry the LiteLLM routing prefix; registry keys
+            # use the served model id (config/model_registry.example.json).
+            profile = self.profiles.get(model.removeprefix("openai/"))
+        return dict(profile or {})
 
     def candidate(self, model: str, *, provider: str = "", task: str = "") -> ModelCandidate:
         measured = self.profile(model)

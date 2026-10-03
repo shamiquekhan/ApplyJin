@@ -21,6 +21,27 @@ def test_context_is_bounded_and_delimited():
     assert estimate_tokens("Python APIs") >= 2
 
 
+def test_context_budgets_are_token_units_end_to_end():
+    package = build_context(
+        job="word " * 200,
+        evidence=["evidence " * 100, "second " * 100, "third " * 10],
+        instructions="keep " * 100,
+        budgets={"job": 40, "candidate_evidence": 60, "instructions": 20, "output": 30},
+    )
+    # every section respects its token budget
+    assert estimate_tokens(package.job) <= 40
+    assert sum(estimate_tokens(item) for item in package.candidate_evidence) <= 60
+    assert estimate_tokens(package.instructions) <= 20
+    # reported totals are in the same unit as the budgets
+    assert package.budget_tokens == 40 + 60 + 20
+    assert package.input_tokens <= package.budget_tokens
+    assert package.context_utilization <= 1.0
+    assert package.metadata["input_tokens"] == package.input_tokens
+    # evidence that does not fit is counted as discarded, not silently kept
+    assert package.retrieved_chunks == 3
+    assert package.discarded_chunks == 2
+
+
 def test_retry_then_success_resets_breaker():
     attempts = 0
     breaker = CircuitBreaker(failure_threshold=2)
@@ -64,3 +85,14 @@ def test_model_registry_prefers_measured_profile_values():
     candidate = registry.candidate("local", provider="vllm", task="resume_generation")
     assert candidate.quality == 0.99
     assert candidate.latency_ms == 20
+
+
+def test_model_registry_matches_chain_entries_with_routing_prefix():
+    registry = ModelRegistry({
+        "Qwen/Qwen2.5-0.5B-Instruct": {"quality": 0.7, "max_context_tokens": 2048}
+    })
+    # chain entries are written as openai/<served-model>; profile lookup must
+    # still find the measured entry.
+    candidate = registry.candidate("openai/Qwen/Qwen2.5-0.5B-Instruct")
+    assert candidate.quality == 0.7
+    assert candidate.max_context == 2048

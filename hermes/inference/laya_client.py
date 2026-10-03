@@ -199,8 +199,11 @@ class LayaDecisionProvider(DecisionProvider):
                 probability = (
                     (float(value) - lo) / (hi - lo) if hi > lo else None
                 )
-            else:  # noul
+            else:  # noul — DecisionAnswer contract: value is "true"/"false",
+                # the raw P(yes) belongs in probability.
                 probability = float(value) if isinstance(value, float) else None
+                if probability is not None:
+                    value = "true" if probability >= 0.5 else "false"
 
             from hermes.inference.schemas import DecisionAnswer
 

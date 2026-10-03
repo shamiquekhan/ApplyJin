@@ -15,6 +15,7 @@ from hermes.inference.agent import DecisionAgent
 from hermes.inference.base import DecisionProvider, ProviderUnavailable
 from hermes.inference.heuristic_provider import HeuristicDecisionProvider
 from hermes.inference.schemas import (
+    DecisionAnswer,
     DecisionQuestion,
     DecisionRequest,
     DecisionResult,
@@ -183,6 +184,58 @@ class TestPolicy:
         assert application_policy(2.5, 0.55, 0.0, lax).action == REVIEW
 
 
+class TestConfidenceGate:
+    def test_low_decision_confidence_routes_to_review(self):
+        from hermes.inference.policies import GENERATE, REVIEW, application_policy
+
+        assert application_policy(4.5, 0.95, 0.0, confidence=0.4).action == REVIEW
+        assert application_policy(4.5, 0.95, 0.0, confidence=0.9).action == GENERATE
+
+    def test_unreported_confidence_does_not_gate(self):
+        from hermes.inference.policies import GENERATE, application_policy
+
+        # Providers without confidence fields report nothing -> default 1.0.
+        assert application_policy(4.5, 0.95, 0.0).action == GENERATE
+
+    def test_security_and_fit_skips_outrank_uncertainty(self):
+        from hermes.inference.policies import SKIP, application_policy
+
+        assert application_policy(5.0, 0.99, 0.95, confidence=0.1).action == SKIP
+        assert application_policy(2.0, 0.99, 0.0, confidence=0.1).action == SKIP
+
+    def test_confidence_from_answers_uses_weakest_reported_value(self):
+        from hermes.inference.policies import confidence_from_answers
+        from hermes.inference.schemas import DecisionAnswer
+
+        assert confidence_from_answers({}) == 1.0
+        unreported = {"a": DecisionAnswer(question="a", type="noul", confidence=0.0)}
+        assert confidence_from_answers(unreported) == 1.0
+        reported = {
+            "a": DecisionAnswer(question="a", type="noul", confidence=0.9),
+            "b": DecisionAnswer(question="b", type="noul", confidence=0.4),
+        }
+        assert confidence_from_answers(reported) == 0.4
+
+    def test_outcome_from_result_gates_on_weakest_confidence(self):
+        from hermes.inference.policies import REVIEW, outcome_from_result
+
+        result = DecisionResult(
+            answers={
+                "technical_fit": DecisionAnswer(
+                    question="technical_fit", type="score",
+                    value="4", probability=0.8, confidence=0.9,
+                ),
+                "meets_core_requirements": DecisionAnswer(
+                    question="meets_core_requirements", type="noul",
+                    value="true", probability=0.95, confidence=0.4,
+                ),
+            }
+        )
+        outcome = outcome_from_result(result)
+        assert outcome.action == REVIEW
+        assert any("decision confidence" in reason for reason in outcome.reasons)
+
+
 class TestDecisionAgent:
     def test_min_confidence_routes_to_review(self, tmp_path):
         question = DecisionQuestion(
@@ -306,4 +359,54 @@ class TestVLLMRouterEntry:
             ChainProvider(provider="vllm", model="openai/m")
         ])
         usable = LLMRouter(cfg)._usable_providers()
-        assert usable[0]["api_base"] == "http://localhost:8000/v1"
+        # default must not collide with `hermes serve` on 8000
+        assert usable[0]["api_base"] == "http://localhost:8001/v1"
+
+
+class TestLayaAnswerMapping:
+    """DecisionAnswer contract for the Laya adapter — fake router, no checkpoint."""
+
+    class _FakeLayaRouter:
+        def __init__(self, answers):
+            self._answers = answers
+
+        def predict(self, state, questions, **kwargs):
+            return {"answers": self._answers, "routing": {"model": "english"}}
+
+    def _decide(self, monkeypatch, answers):
+        from hermes.inference.laya_client import LayaDecisionProvider
+
+        provider = LayaDecisionProvider()
+        monkeypatch.setattr(provider, "_get_router", lambda: self._FakeLayaRouter(answers))
+        return provider.decide(DecisionRequest(state="state", questions=_questions()))
+
+    def test_answers_follow_decision_answer_contract(self, monkeypatch):
+        result = self._decide(monkeypatch, {
+            "job_type": {
+                "choice": "AI Engineer",
+                "probabilities": {"AI Engineer": 0.9},
+                "answer_confidence": 0.85,
+            },
+            "technical_fit": {"score": 4, "answer_confidence": 0.7},
+            "meets_core_requirements": {"noul": 0.31, "answer_confidence": 0.8},
+            "prompt_injection": {"noul": 0.97, "answer_confidence": 0.9},
+        })
+        assert result.backend == "laya"
+        assert result.model == "english"
+
+        inj = result.answers["prompt_injection"]
+        assert inj.value == "true"            # noul value is "true"/"false"...
+        assert inj.probability == pytest.approx(0.97)  # ...P(yes) lives here
+        assert inj.confidence == pytest.approx(0.9)
+
+        core = result.answers["meets_core_requirements"]
+        assert core.value == "false"
+        assert core.probability == pytest.approx(0.31)
+
+        choice = result.answers["job_type"]
+        assert choice.value == "AI Engineer"
+        assert choice.probabilities["AI Engineer"] == pytest.approx(0.9)
+
+        score = result.answers["technical_fit"]
+        assert score.value == "4"
+        assert score.probability == pytest.approx(0.8)

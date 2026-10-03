@@ -17,7 +17,7 @@ class VLLMProvider(LLMProvider):
     name = "vllm"
 
     def __init__(self, base_url: str | None = None, model: str | None = None, api_key: str | None = None, timeout: float = 60.0, client: Any | None = None) -> None:
-        self.base_url = base_url or os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1")
+        self.base_url = base_url or os.getenv("VLLM_BASE_URL", "http://localhost:8001/v1")
         self.model = model or os.getenv("VLLM_MODEL", "")
         self.api_key = api_key or os.getenv("VLLM_API_KEY", "local")
         self.timeout = timeout

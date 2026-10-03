@@ -23,6 +23,8 @@ htmlcov/
 data/hermes.db
 data/hermes.db-journal
 data/hermes.db-*
+data/applications.db
+data/metrics.sqlite3
 data/chroma_db/
 data/applications/
 data/pdfs/
@@ -41,6 +43,7 @@ data/base_resume.docx
 # Config with real values (examples are committed)
 config/profile.yml
 config/llm_config.yml
+config/model_registry.json
 config/search_configs.yml
 config/answer_bank.yml
 config/email_config.yml

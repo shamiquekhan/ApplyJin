@@ -8,6 +8,7 @@ submit) apply unchanged to everything this app generates.
 
 from __future__ import annotations
 
+import asyncio
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -667,7 +668,9 @@ async def create_application(
 
         # Pin the keyword set at creation so before/after scores are
         # always computed against the same list (apples to apples).
-        keywords = jd.get("keywords") or extract_keywords(jd["content"], _router())
+        keywords = jd.get("keywords") or await asyncio.to_thread(
+            extract_keywords, jd["content"], _router()
+        )
         if not jd.get("keywords"):
             store.save_jd_keywords(jd_id, keywords)
 
@@ -768,8 +771,10 @@ async def tailor_application(
                 keywords = jd.get("keywords") or {}
                 snapshot = master.snapshot()
                 report = select_for_jd(snapshot, keywords, jd["content"])
-                result = tailor_from_master(
-                    snapshot, report, jd["content"], keywords, router
+                # Generation is synchronous (network-bound); keep it off the
+                # event loop so the API stays responsive during tailoring.
+                result = await asyncio.to_thread(
+                    tailor_from_master, snapshot, report, jd["content"], keywords, router
                 )
                 result["selection"] = [
                     {
@@ -783,7 +788,7 @@ async def tailor_application(
                 result["gaps"] = report.missing_skills
             else:
                 # ---- legacy: raw resume + chosen keywords
-                result = run_tailor(resume, jd, selected, router)
+                result = await asyncio.to_thread(run_tailor, resume, jd, selected, router)
                 result["selection"] = []
                 result["skill_selection"] = selected
                 result["gaps"] = []
@@ -1174,7 +1179,9 @@ your facts, say it's not in the Master CV."""
 
         router = _router()
         try:
-            response = router.complete(prompt=user_prompt, system=system_prompt)
+            response = await asyncio.to_thread(
+                router.complete, prompt=user_prompt, system=system_prompt
+            )
             answer = response.text
         except LLMUnavailable:
             answer = (
@@ -1287,7 +1294,9 @@ Return JSON with keys: "headline" (string, max 220 chars) and "about" (string, m
 
     router = _router()
     try:
-        response = router.complete_json(prompt=user_prompt, system=system_prompt)
+        response = await asyncio.to_thread(
+            router.complete_json, prompt=user_prompt, system=system_prompt
+        )
         headline = response.get("headline", "")
         about = response.get("about", "")
     except (LLMUnavailable, Exception):

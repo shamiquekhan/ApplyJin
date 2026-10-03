@@ -21,6 +21,8 @@ from hermes.inference.metrics import DECISION_METRICS, RuntimeMetrics
 from hermes.inference.verification import ClaimReference, classify_claim, extract_claims, verify_claims
 from hermes.inference.metrics_store import MetricsStore
 from hermes.inference.failures import FailureCode, classify_failure
+from hermes.inference.model_registry import ModelRegistry
+from hermes.inference.litellm_client import LiteLLMProvider
 from hermes.inference.policies import (
     APPLICATION_POLICY_VERSION,
     DEFAULT_THRESHOLDS,
@@ -76,6 +78,8 @@ __all__ = [
     "MetricsStore",
     "FailureCode",
     "classify_failure",
+    "ModelRegistry",
+    "LiteLLMProvider",
     "DecisionQuestion",
     "DecisionRequest",
     "DecisionResult",

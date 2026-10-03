@@ -22,6 +22,7 @@ from typing import Any, Optional
 from hermes.config import LLMConfig, RetrySettings
 from hermes.models import LLMResponse
 from hermes.inference.router import ModelCandidate, RoutingWeights, order_candidates
+from hermes.inference.model_registry import ModelRegistry
 
 logger = logging.getLogger("hermes.llm")
 
@@ -64,8 +65,9 @@ def _extract_json(text: str) -> Optional[dict[str, Any]]:
 class LLMRouter:
     """Routes completion + JSON calls through a failover chain via LiteLLM."""
 
-    def __init__(self, config: Optional[LLMConfig] = None) -> None:
+    def __init__(self, config: Optional[LLMConfig] = None, registry: Optional[ModelRegistry] = None) -> None:
         self.config = config or LLMConfig()
+        self.registry = registry or ModelRegistry.from_environment()
         self._litellm = None
         self._last_call: dict[str, datetime] = {}   # provider -> last call time
         self._min_interval = _DEFAULT_MIN_INTERVAL
@@ -167,13 +169,8 @@ class LLMRouter:
         # Choose the preferred model by explicit utility, then retain the
         # existing provider queue as the reliability fallback path.
         candidates = [
-            ModelCandidate(
-                name=provider["model"],
-                quality=0.90 if task == "resume_generation" and provider.get("provider") == "vllm" else 0.80,
-                latency_ms=100.0 if "vllm" in provider.get("api_base", "") else 250.0,
-                resource_cost=1.0,
-                failure_probability=0.10,
-                max_context=provider.get("max_context", "8192") and int(provider.get("max_context", "8192")),
+            self.registry.candidate(
+                provider["model"], provider=provider.get("provider", ""), task=task
             )
             for provider in providers
         ]

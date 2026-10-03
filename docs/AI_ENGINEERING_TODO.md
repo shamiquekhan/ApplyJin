@@ -50,7 +50,9 @@ ordinary CLI use or tests.
 - [x] Token-aware context integration in resume generation
 - [x] Typed verification for generated metrics and dates
 - [ ] Consolidate LiteLLM and vLLM behind the canonical `LLMProvider`
+- [x] Add a canonical `LLMProvider` bridge for the existing LiteLLM router
 - [ ] Replace hard-coded routing estimates with measured model-registry data
+- [x] Add measured model-registry support with conservative unmeasured defaults
 - [ ] Add hybrid BM25 plus dense retrieval and reranking
 - [ ] Expand typed verification to companies, titles, skills, and certifications
 - [ ] Add token usage, TTFT, TPOT, queue, retry, and provider telemetry

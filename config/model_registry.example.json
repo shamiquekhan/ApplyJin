@@ -1,0 +1,10 @@
+{
+  "Qwen/Qwen2.5-0.5B-Instruct": {
+    "quality": 0.8,
+    "p95_latency_ms": 1358.82,
+    "tokens_per_second": 34.02,
+    "failure_rate": 0.0,
+    "resource_cost": 0.95,
+    "max_context_tokens": 2048
+  }
+}

@@ -7,6 +7,7 @@ import pytest
 from hermes.inference.context import build_context, estimate_tokens
 from hermes.inference.reliability import CircuitBreaker, CircuitOpen, call_with_retry
 from hermes.inference.router import ModelCandidate, RoutingWeights, order_candidates, utility
+from hermes.inference.model_registry import ModelRegistry
 
 
 def test_context_is_bounded_and_delimited():
@@ -56,3 +57,10 @@ def test_generation_candidates_are_ordered_by_configured_utility():
     ordered = order_candidates(candidates, weights=RoutingWeights(quality=1, latency=0.5, resource=0.1, failure=0.5))
     assert [candidate.name for candidate in ordered] == ["fast", "slow"]
     assert utility(candidates[0], RoutingWeights()) > -1.0
+
+
+def test_model_registry_prefers_measured_profile_values():
+    registry = ModelRegistry({"local": {"quality": 0.99, "p95_latency_ms": 20, "failure_rate": 0.01}})
+    candidate = registry.candidate("local", provider="vllm", task="resume_generation")
+    assert candidate.quality == 0.99
+    assert candidate.latency_ms == 20

@@ -226,7 +226,11 @@ class ResumeTailor:
         violations = validate_tailored(response.text, resume, analysis)
         evidence = [(f"bullet-{index}", bullet) for index, bullet in enumerate(relevant, 1)]
         evidence.append(("master-resume", resume.raw_text))
-        claim_references = verify_claims(response.text, evidence)
+        claim_references = verify_claims(
+            response.text,
+            evidence,
+            known_entities={"SKILL": resume.skills},
+        )
         unsupported = [reference.claim for reference in claim_references if not reference.supported]
         if unsupported:
             violations.append(f"Unsupported claims: {unsupported[:3]}")

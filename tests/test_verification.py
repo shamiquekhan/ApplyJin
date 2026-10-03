@@ -25,3 +25,20 @@ def test_metrics_and_dates_require_exact_evidence_values():
     )
     assert references[0].supported is False
     assert references[0].claim_type == "METRIC"
+
+
+def test_typed_skill_claim_requires_a_known_candidate_skill():
+    references = verify_claims(
+        "- Skills: Python and Rust",
+        [("b1", "Skills: Python and Rust")],
+        known_entities={"SKILL": ["Python"]},
+    )
+    assert references[0].claim_type == "SKILL"
+    assert references[0].supported is True
+
+    unsupported = verify_claims(
+        "- Skills: Rust",
+        [("b1", "Skills: Rust")],
+        known_entities={"SKILL": ["Python"]},
+    )
+    assert unsupported[0].supported is False

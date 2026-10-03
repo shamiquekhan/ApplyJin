@@ -1,0 +1,3 @@
+{"id":"lora-train-1","split":"synthetic_train","text":"Classify this job: Build Python APIs with FastAPI. Answer: Software Engineer"}
+{"id":"lora-train-2","split":"synthetic_train","text":"Classify this job: Train neural networks with PyTorch. Answer: ML Engineer"}
+{"id":"lora-train-3","split":"synthetic_train","text":"Classify this job: Build RAG and LLM systems. Answer: AI Engineer"}

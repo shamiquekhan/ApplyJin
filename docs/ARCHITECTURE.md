@@ -61,3 +61,19 @@ JobScout ──> JDAnalyzer ──> FitScorer ──> ResumeTailor ──> Cover
 Every component has a fallback so the pipeline never hard-crashes:
 LLM → heuristic; ChromaDB → JSON cosine; MiniLM → hashed embeddings;
 Playwright PDF → WeasyPrint → HTML; JobSpy → sample JSONL.
+
+## AI inference and evaluation layer
+
+```text
+retrieval/context budget
+   -> Laya or heuristic decision provider
+   -> deterministic policy
+   -> utility-weighted generation router
+   -> vLLM/OpenAI-compatible provider
+   -> claim verification
+   -> human review
+```
+
+Decision traces store hashes and typed results rather than raw candidate
+documents. Runtime metrics are available at `/metrics`; benchmark reports live
+under `evaluation/reports/`.

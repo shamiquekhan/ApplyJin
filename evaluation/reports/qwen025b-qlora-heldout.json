@@ -1,0 +1,12 @@
+{
+  "model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "method": "QLoRA-NF4",
+  "train_cases": 3,
+  "heldout_cases": 2,
+  "train_loss": 5.3698,
+  "heldout_loss_before": 5.546,
+  "heldout_loss_after": 5.4884,
+  "heldout_loss_delta": -0.0576,
+  "train_step_ms": 1154.54,
+  "trainable_parameters": 270336
+}

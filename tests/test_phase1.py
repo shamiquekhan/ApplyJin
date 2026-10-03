@@ -13,6 +13,7 @@ from hermes.agents.jd_analyzer import heuristic_analyze
 from hermes.agents.fit_scorer import FitScorer
 from hermes.agents.resume_tailor import select_relevant_bullets, validate_tailored
 from hermes.agents.tracker import Tracker
+from hermes.orchestrator import _verification_failure_reason
 from hermes.utils.ats_scorer import (
     keyword_match_score,
     missing_keywords,
@@ -109,6 +110,16 @@ class TestATSScorer:
         assert experience_match(6, 5) == 1.0
         assert experience_match(4, 5) == 0.75  # within one year
         assert experience_match(1, 5) == 0.4
+
+
+class TestVerificationGate:
+    def test_unverified_tailoring_has_a_reviewable_reason(self):
+        assert _verification_failure_reason(
+            ["Added skills the candidate lacks: ['Rust']"]
+        ) == "Added skills the candidate lacks: ['Rust']"
+
+    def test_missing_violation_detail_uses_stable_fallback(self):
+        assert _verification_failure_reason([]) == "verification failed"
 
 
 # ---------------------------------------------------------------- dedup

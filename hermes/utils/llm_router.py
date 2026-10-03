@@ -21,6 +21,7 @@ from typing import Any, Optional
 
 from hermes.config import LLMConfig, RetrySettings
 from hermes.models import LLMResponse
+from hermes.inference.router import ModelCandidate, RoutingWeights, order_candidates
 
 logger = logging.getLogger("hermes.llm")
 
@@ -90,13 +91,25 @@ class LLMRouter:
             if entry.provider == "ollama" and entry.model:
                 usable.append(
                     {
+                        "provider": "ollama",
                         "model": entry.model,
                         "api_base": entry.api_base or "http://localhost:11434",
                         "api_key": entry.api_key or "ollama",
                     }
                 )
+            elif entry.provider == "vllm" and entry.model:
+                # vLLM serves an OpenAI-compatible API locally; no real key
+                # needed (any non-empty string satisfies the client).
+                usable.append(
+                    {
+                        "provider": "vllm",
+                        "model": entry.model,
+                        "api_base": entry.api_base or "http://localhost:8000/v1",
+                        "api_key": entry.api_key or "local",
+                    }
+                )
             elif entry.model and entry.api_key:
-                usable.append({"model": entry.model, "api_key": entry.api_key})
+                usable.append({"provider": entry.provider, "model": entry.model, "api_key": entry.api_key})
             else:
                 logger.debug("Skipping %s (missing key or model)", entry.provider)
         return usable
@@ -132,7 +145,13 @@ class LLMRouter:
             self._litellm = litellm
         return self._litellm
 
-    def complete(self, prompt: str, system: str = "") -> LLMResponse:
+    def complete(
+        self,
+        prompt: str,
+        system: str = "",
+        task: str = "generation",
+        context_length: int = 0,
+    ) -> LLMResponse:
         providers = self._usable_providers()
         if not providers:
             raise LLMUnavailable(
@@ -144,6 +163,31 @@ class LLMRouter:
         retries = self.config.retries
         last_error: Exception | None = None
         waited_total = 0.0
+
+        # Choose the preferred model by explicit utility, then retain the
+        # existing provider queue as the reliability fallback path.
+        candidates = [
+            ModelCandidate(
+                name=provider["model"],
+                quality=0.90 if task == "resume_generation" and provider.get("provider") == "vllm" else 0.80,
+                latency_ms=100.0 if "vllm" in provider.get("api_base", "") else 250.0,
+                resource_cost=1.0,
+                failure_probability=0.10,
+                max_context=provider.get("max_context", "8192") and int(provider.get("max_context", "8192")),
+            )
+            for provider in providers
+        ]
+        preferred = order_candidates(
+            candidates,
+            context_length=context_length,
+            weights=RoutingWeights.from_environment(),
+        )
+        by_model = {provider["model"]: provider for provider in providers}
+        providers = [by_model[candidate.name] for candidate in preferred]
+        if not providers:
+            raise LLMUnavailable(
+                f"No configured provider supports {context_length} context tokens for task {task}"
+            )
 
         # Rotation queue: on 429, same-key sibling models move to the front
         # (per-model quota means siblings usually still have headroom).

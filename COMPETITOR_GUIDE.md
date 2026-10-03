@@ -246,3 +246,11 @@ problems:
 
 Not cited: competitor comparison pages, affiliate review sites, SEO content
 marketing. Those are sales materials, not sources.
+
+## AI engineering status
+
+The repository now also contains a local decision and inference layer, offline
+evaluation harness, evidence verification, Prometheus metrics, vLLM benchmarks,
+NF4 quantization comparison, and held-out QLoRA smoke experiment. See
+[docs/AI_ENGINEERING_TODO.md](docs/AI_ENGINEERING_TODO.md) for the evidence-backed
+status; hardware-dependent matrix expansion remains separate from completed work.

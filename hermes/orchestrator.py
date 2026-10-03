@@ -102,6 +102,10 @@ class Orchestrator:
         self.library = ExperienceLibrary()
         self.analyzer = JDAnalyzer(router)
         self.scorer = FitScorer(self.profile, self.profile.limits.min_fit_score)
+        # Decision layer: additive gate after the deterministic pre-filter.
+        # Falls back to heuristic decisions when Laya is unavailable; the
+        # pipeline never hard-crashes on a decision-model failure.
+        self.decision_agent = _build_decision_agent()
         # Phase 3: inject the active learned style guide into the tailor.
         version, guide = self.tracker.active_style_guide()
         if guide:
@@ -172,12 +176,31 @@ class Orchestrator:
             return
         result.passed_filter += 1
 
+        # Decision layer: batched typed decisions (classification, fit,
+        # core-requirements, prompt-injection) -> deterministic policy.
+        decision_outcome, trace = self._decide(job, analysis)
+        if decision_outcome.action == "SKIP":
+            reason = "; ".join(decision_outcome.reasons) or "policy skip"
+            result.skipped.append(f"{tag}: decision layer skip — {reason}")
+            return
+        if decision_outcome.action == "REVIEW":
+            result.skipped.append(
+                f"{tag}: decision layer REVIEW — "
+                + "; ".join(decision_outcome.reasons)
+            )
+
         # Phase 3: random A/B assignment of the resume style variant.
         from hermes.agents.ab_testing import assign_variant
 
         variant = assign_variant()
 
         tailored = self.tailor.tailor(self.resume, job, analysis, variant=variant)
+        if not tailored.validated:
+            reason = _verification_failure_reason(tailored.guardrail_violations)
+            result.blocked.append(f"{tag}: verification failure — {reason}")
+            logger.warning("Blocked unverified application for %s: %s", job.job_id, reason)
+            return
+
         letter = self.cover.generate(analysis, tailored)
         result.tailored += 1
 
@@ -225,6 +248,74 @@ class Orchestrator:
             result.tracked += 1
             logger.info("Queued for review: %s (fit=%.2f, ATS %.2f->%.2f)",
                         tag, scored.fit_score, ats_before, ats_after)
+
+    def _decide(self, job: JobPosting, analysis) -> tuple:
+        """Run the decision layer for one job. Never raises."""
+        try:
+            from hermes.inference.agent import DecisionAgent
+
+            state = DecisionAgent.build_state(
+                job={
+                    "title": job.title,
+                    "company": job.company,
+                    "description": job.description,
+                },
+                requirements=analysis.required_skills,
+                candidate={
+                    "skills": self.resume.skills,
+                    "projects": [
+                        b.text[:120] for b in self.resume.bullets[:12]
+                    ],
+                    "experience": (
+                        f"{self.resume.seniority}, "
+                        f"{self.resume.years_experience} years"
+                    ),
+                },
+            )
+            outcome, trace = self.decision_agent.decide(
+                state, job_id=job.job_id, stage="gate"
+            )
+            backend = trace.backend or "heuristic"
+            logger.info(
+                "Decision %s: %s (fit=%s, p_req=%.2f, backend=%s, %.0fms)",
+                job.job_id, outcome.action,
+                trace.answers.get("technical_fit").value
+                if trace.answers.get("technical_fit") else "n/a",
+                trace.answers.get("meets_core_requirements").probability
+                if trace.answers.get("meets_core_requirements")
+                and trace.answers.get("meets_core_requirements").probability is not None
+                else 0.0,
+                backend, trace.latency_ms,
+            )
+            return outcome, trace
+        except Exception as exc:  # noqa: BLE001 — decision never breaks pipeline
+            logger.warning("Decision layer failed (%s) — continuing", exc)
+            from hermes.inference.policies import GENERATE, PolicyOutcome
+
+            return (
+                PolicyOutcome(action=GENERATE, reasons=["decision layer unavailable"]),
+                None,
+            )
+
+
+def _build_decision_agent():
+    """Build a DecisionAgent honoring LAYA_MODEL / LAYA_DEVICE env config.
+
+    Returns None on construction failure so the pipeline keeps running
+    without the decision layer rather than crashing.
+    """
+    try:
+        from hermes.inference.agent import DecisionAgent
+
+        return DecisionAgent()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Decision layer unavailable: %s", exc)
+        return None
+
+
+def _verification_failure_reason(violations: list[str]) -> str:
+    """Format verifier output for the blocked application review record."""
+    return "; ".join(violations) or "verification failed"
 
 
 def _dedupe_by_id(jobs: list[JobPosting]) -> list[JobPosting]:

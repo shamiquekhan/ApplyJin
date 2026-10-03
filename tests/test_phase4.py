@@ -506,6 +506,28 @@ class TestWebDashboard:
     def test_health(self, client):
         assert client.get("/health").json()["status"] == "ok"
 
+    def test_metrics_exposes_prometheus_text(self, client):
+        response = client.get("/metrics")
+        assert response.status_code == 200
+        assert "applyjin_decision_latency_p95_ms" in response.text
+
+    def test_decisions_exposes_hashed_trace_metadata(self, client, tmp_path, monkeypatch):
+        from hermes.inference.agent import DecisionAgent
+
+        traces = tmp_path / "traces.jsonl"
+        agent = DecisionAgent(traces_path=traces)
+        agent._persist(
+            __import__("hermes.inference.schemas", fromlist=["DecisionTrace"]).DecisionTrace(
+                decision_id="d1", input_state_hash="abc123", action="REVIEW"
+            )
+        )
+        agent.metrics_store.close()
+        import hermes.inference.agent as decision_agent
+        monkeypatch.setattr(decision_agent, "TRACES_PATH", traces)
+        response = client.get("/api/decisions?limit=1")
+        assert response.status_code == 200
+        assert response.json()[0]["input_state_hash"] == "abc123"
+
     def test_validation_errors(self, client):
         # empty content rejected
         resp = client.post(

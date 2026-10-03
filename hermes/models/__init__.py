@@ -94,6 +94,7 @@ class TailoredResume(BaseModel):
     markdown: str = ""
     source_bullets: list[str] = Field(default_factory=list)
     guardrail_violations: list[str] = Field(default_factory=list)
+    claim_references: list[dict[str, object]] = Field(default_factory=list)
     validated: bool = False
     model_used: str = ""
 

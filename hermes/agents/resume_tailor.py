@@ -18,6 +18,7 @@ from hermes.models import JobAnalysis, JobPosting, ResumeDocument, TailoredResum
 from hermes.utils.embeddings import cosine_similarity, get_embeddings
 from hermes.utils.experience_library import ExperienceLibrary
 from hermes.utils.llm_router import LLMRouter, LLMUnavailable
+from hermes.inference.verification import verify_claims
 
 logger = logging.getLogger("hermes.tailor")
 
@@ -185,12 +186,24 @@ class ResumeTailor:
             style_guide=self._guide_for(variant),
             required_skills=", ".join(analysis.required_skills) or "n/a",
             must_have_keywords=", ".join(analysis.must_have_keywords) or "n/a",
-            relevant_bullets="\n".join(f"- {b}" for b in relevant) or "n/a",
-            base_resume=resume.raw_text[:6000],
+            relevant_bullets=(
+                "<VERIFIED_CANDIDATE_EVIDENCE>\n"
+                + ("\n".join(f"- {b}" for b in relevant) or "n/a")
+                + "\n</VERIFIED_CANDIDATE_EVIDENCE>"
+            ),
+            base_resume=(
+                "<UNTRUSTED_UPLOADED_RESUME>\n"
+                + resume.raw_text[:6000]
+                + "\n</UNTRUSTED_UPLOADED_RESUME>"
+            ),
         )
 
         try:
-            response = self.router.complete(prompt=prompt)
+            response = self.router.complete(
+                prompt=prompt,
+                task="resume_generation",
+                context_length=len(prompt),
+            )
         except LLMUnavailable as exc:
             logger.warning(
                 "LLM unavailable (%s) — falling back to base resume for %s",
@@ -209,6 +222,12 @@ class ResumeTailor:
             return self._base_fallback(resume, job, relevant)
 
         violations = validate_tailored(response.text, resume, analysis)
+        evidence = [(f"bullet-{index}", bullet) for index, bullet in enumerate(relevant, 1)]
+        evidence.append(("master-resume", resume.raw_text))
+        claim_references = verify_claims(response.text, evidence)
+        unsupported = [reference.claim for reference in claim_references if not reference.supported]
+        if unsupported:
+            violations.append(f"Unsupported claims: {unsupported[:3]}")
         if violations:
             logger.warning(
                 "Tailored resume for %s failed validation: %s",
@@ -222,6 +241,7 @@ class ResumeTailor:
             markdown=response.text,
             source_bullets=relevant,
             guardrail_violations=violations,
+            claim_references=[reference.__dict__ for reference in claim_references],
             validated=not violations,
             model_used=response.model,
         )

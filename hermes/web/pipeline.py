@@ -203,6 +203,7 @@ def tailor(
     return {
         "tailored_resume_md": result.markdown,
         "guardrail_violations": result.guardrail_violations,
+        "claim_references": result.claim_references,
         "validated": result.validated,
         "model_used": result.model_used,
     }

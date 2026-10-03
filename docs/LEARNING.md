@@ -58,3 +58,10 @@ scripts/learn_weekly.sh
   ├── hermes triage-email --apply
   └── hermes learn --apply
 ```
+
+## Evaluation-driven learning
+
+Check learning changes against the offline evaluation harness before promotion.
+Keep synthetic training cases separate from held-out cases, compare grounding,
+correctness, and latency reports, and do not promote an adapter solely because
+its training loss improved.

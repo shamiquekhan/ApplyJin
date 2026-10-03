@@ -38,3 +38,9 @@ Auto-fill job applications with your tailored resume from ApplyJin.
 - All data stays on your machine and your ApplyJin backend
 - No data is sent to third parties
 - The extension only runs when you click the icon
+
+## AI content boundary
+
+Job descriptions extracted by the extension are untrusted external content.
+ApplyJin sends them through explicit delimiters and deterministic safety gates;
+the extension never submits an application or overrides model policy.

@@ -1,0 +1,25 @@
+{
+  "model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "variants": [
+    {
+      "variant": "fp16",
+      "model": "Qwen/Qwen2.5-0.5B-Instruct",
+      "load_ms": 1043.27,
+      "latency_ms": 1422.84,
+      "generated_tokens": 16,
+      "tokens_per_second": 11.25,
+      "peak_gpu_memory_mb": 953.7,
+      "text": "Retrieval Augmented Generation (RAG) is a technique that enhances the"
+    },
+    {
+      "variant": "nf4-4bit",
+      "model": "Qwen/Qwen2.5-0.5B-Instruct",
+      "load_ms": 1734.11,
+      "latency_ms": 515.26,
+      "generated_tokens": 16,
+      "tokens_per_second": 31.05,
+      "peak_gpu_memory_mb": 452.46,
+      "text": "Retrieval Augmented Generation (RAG) is a technique that augments"
+    }
+  ]
+}

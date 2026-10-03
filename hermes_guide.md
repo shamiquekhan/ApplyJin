@@ -992,4 +992,11 @@ Hermes, the Greek messenger god, was the patron of boundaries, commerce, and cun
 
 ---
 
+## Current local AI stack
+
+The implementation includes Laya decision providers, optional vLLM serving,
+budgeted retrieval context, claim verification, utility-based routing, failure
+taxonomy, runtime metrics, and evaluation/benchmark tooling. See
+`docs/AI_ENGINEERING_TODO.md` for verified status and local experiment reports.
+
 *Document generated September 2026. All tools and APIs referenced offer genuine free tiers as of this date. Rate limits and terms change — verify before deploying.*

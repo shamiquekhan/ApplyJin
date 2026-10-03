@@ -513,3 +513,15 @@ That's the point — it's warning you the listing might be fake or recycled. Rev
 Made by [Shamique Khan](https://github.com/shamiquekhan)
 
 </div>
+
+## 17. AI engineering experiments
+
+```bash
+python -m evaluation.runner \
+   --dataset evaluation/datasets/regression.jsonl \
+   --report evaluation/reports/latest.json
+```
+
+The web API exposes `/metrics` for Prometheus and `/api/decisions` for hashed
+decision traces. Generated claims are verified before an application is tracked,
+and final submission remains a human action.

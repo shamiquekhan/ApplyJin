@@ -1,0 +1,100 @@
+{
+  "model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "gpu": "NVIDIA GeForce GTX 1650",
+  "gpu_memory_gib": 4,
+  "server": "http://127.0.0.1:8001/v1",
+  "benchmarks": [
+    {
+      "requests": 2,
+      "successful": 2,
+      "failures": 0,
+      "failure_rate": 0.0,
+      "ttft_p50_ms": 146.58,
+      "ttft_p95_ms": 1158.78,
+      "tpot_p50_ms": 6.87,
+      "tpot_p95_ms": 6.9,
+      "latency_p50_ms": 345.72,
+      "latency_p95_ms": 1358.82,
+      "latency_p99_ms": 1358.82,
+      "tokens_per_second": 34.02,
+      "requests_per_second": 1.17,
+      "server_metrics_available": true,
+      "model": "Qwen/Qwen2.5-0.5B-Instruct",
+      "concurrency": 1,
+      "max_tokens": 32,
+      "results": [
+        {
+          "status": "ok",
+          "ttft_ms": 1158.78,
+          "latency_ms": 1358.82,
+          "tpot_ms": 6.9,
+          "tokens": 29
+        },
+        {
+          "status": "ok",
+          "ttft_ms": 146.58,
+          "latency_ms": 345.72,
+          "tpot_ms": 6.87,
+          "tokens": 29
+        }
+      ]
+    },
+    {
+      "requests": 4,
+      "successful": 4,
+      "failures": 0,
+      "failure_rate": 0.0,
+      "ttft_p50_ms": 412.8,
+      "ttft_p95_ms": 539.8,
+      "tpot_p50_ms": 185.89,
+      "tpot_p95_ms": 186.27,
+      "latency_p50_ms": 5803.7,
+      "latency_p95_ms": 5941.76,
+      "latency_p99_ms": 5941.76,
+      "tokens_per_second": 9.83,
+      "requests_per_second": 0.35,
+      "server_metrics_available": true,
+      "model": "Qwen/Qwen2.5-0.5B-Instruct",
+      "concurrency": 2,
+      "max_tokens": 32,
+      "results": [
+        {
+          "status": "ok",
+          "ttft_ms": 539.8,
+          "latency_ms": 5941.76,
+          "tpot_ms": 186.27,
+          "tokens": 29
+        },
+        {
+          "status": "ok",
+          "ttft_ms": 412.8,
+          "latency_ms": 5803.7,
+          "tpot_ms": 185.89,
+          "tokens": 29
+        },
+        {
+          "status": "ok",
+          "ttft_ms": 329.07,
+          "latency_ms": 5162.08,
+          "tpot_ms": 185.88,
+          "tokens": 26
+        },
+        {
+          "status": "ok",
+          "ttft_ms": 330.02,
+          "latency_ms": 5168.76,
+          "tpot_ms": 179.21,
+          "tokens": 27
+        }
+      ]
+    }
+  ],
+  "vllm_metrics": {
+    "kv_cache_usage_perc": 0.0,
+    "prompt_tokens_total": 222.0,
+    "prompt_tokens_cached_total": 112.0,
+    "generation_tokens_total": 175.0,
+    "num_requests_running": 0.0,
+    "num_requests_waiting": 0.0
+  }
+}

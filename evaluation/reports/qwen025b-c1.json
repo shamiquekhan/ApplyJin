@@ -1,0 +1,35 @@
+{
+  "requests": 2,
+  "successful": 2,
+  "failures": 0,
+  "failure_rate": 0.0,
+  "ttft_p50_ms": 146.58,
+  "ttft_p95_ms": 1158.78,
+  "tpot_p50_ms": 6.87,
+  "tpot_p95_ms": 6.9,
+  "latency_p50_ms": 345.72,
+  "latency_p95_ms": 1358.82,
+  "latency_p99_ms": 1358.82,
+  "tokens_per_second": 34.02,
+  "requests_per_second": 1.17,
+  "server_metrics_available": true,
+  "model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "concurrency": 1,
+  "max_tokens": 32,
+  "results": [
+    {
+      "status": "ok",
+      "ttft_ms": 1158.78,
+      "latency_ms": 1358.82,
+      "tpot_ms": 6.9,
+      "tokens": 29
+    },
+    {
+      "status": "ok",
+      "ttft_ms": 146.58,
+      "latency_ms": 345.72,
+      "tpot_ms": 6.87,
+      "tokens": 29
+    }
+  ]
+}

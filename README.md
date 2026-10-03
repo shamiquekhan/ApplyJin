@@ -483,3 +483,18 @@ research landscape (15+ projects analyzed).
 Made by [Shamique Khan](https://github.com/shamiquekhan)
 
 </div>
+
+## AI Engineering Upgrade
+
+ApplyJin now includes a local inference and evaluation path around the existing
+application workflow:
+
+- Laya typed decisions with deterministic policy gates and hashed traces
+- vLLM-compatible generation through a provider abstraction
+- Evidence-budgeted retrieval, claim verification, and unsupported-claim blocking
+- Utility-weighted routing, retries, circuit breakers, and privacy-safe metrics
+- Offline evaluation, Prometheus metrics, vLLM benchmarks, and quantization/QLoRA tools
+
+See [docs/AI_ENGINEERING_TODO.md](docs/AI_ENGINEERING_TODO.md) for the verified
+status and reproducible experiment commands. The critical path remains offline
+capable and always stops before human submission.

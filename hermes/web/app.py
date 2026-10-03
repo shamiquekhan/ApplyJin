@@ -15,7 +15,7 @@ from typing import Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from hermes.config import load_dotenv, load_profile
@@ -831,6 +831,7 @@ async def tailor_application(
                 "scores_after": scores_after,
                 "delta": delta,
                 "guardrail_violations": result["guardrail_violations"],
+                "claim_references": result.get("claim_references", []),
                 "validated": result["validated"],
                 "model_used": result["model_used"],
                 "selection": result.get("selection", []),
@@ -1041,6 +1042,27 @@ def health() -> dict:
     return {"status": "ok", "time": datetime.utcnow().isoformat()}
 
 
+@app.get("/metrics", response_class=PlainTextResponse)
+def metrics() -> str:
+    """Expose non-sensitive runtime counters for Prometheus scraping."""
+    from hermes.inference.metrics import DECISION_METRICS
+
+    return DECISION_METRICS.prometheus_text()
+
+
+@app.get("/api/decisions")
+def decisions(limit: int = 20) -> list[dict]:
+    """Return inspectable decision metadata without raw candidate content."""
+    from hermes.inference.agent import DecisionAgent
+
+    bounded_limit = max(1, min(limit, 100))
+    agent = DecisionAgent()
+    try:
+        return [trace.model_dump(mode="json") for trace in agent.recent_traces(bounded_limit)]
+    finally:
+        agent.metrics_store.close()
+
+
 # -------------------------------------------------------- copilot chat
 
 
@@ -1126,7 +1148,9 @@ Summary: {profile.get('summary', 'N/A')[:500]}
 Skills: {skills_text[:800]}
 
 ## Relevant Experience (RAG-retrieved)
+<UNTRUSTED_RETRIEVED_CONTENT>
 {bullets_text or '(no relevant bullets found)'}
+</UNTRUSTED_RETRIEVED_CONTENT>
 
 ## Work History
 {exp_text or '(none)'}
@@ -1135,10 +1159,14 @@ Skills: {skills_text[:800]}
 {proj_text or '(none)'}
 
 ## Target Job Description
+<UNTRUSTED_JOB_DESCRIPTION>
 {jd_text or '(no specific job targeted)'}
+</UNTRUSTED_JOB_DESCRIPTION>
 
 ## Currently Tailored Resume (if any)
+<UNTRUSTED_GENERATED_DOCUMENT>
 {tailored_text or '(not yet tailored)'}
+</UNTRUSTED_GENERATED_DOCUMENT>
 
 Answer the user's question using ONLY the facts above. Cite specific
 experiences or projects when relevant. If asked about something not in

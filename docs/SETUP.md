@@ -72,3 +72,16 @@ Cron: `scripts/daily_run.sh` (2×/day), `scripts/learn_weekly.sh` (Mon).
 | Ollama connection refused | Start ollama or remove it from the chain |
 | Duplicate job blocked | Intended — never apply twice |
 | Daily limit reached | Raise `limits.max_applications_per_day` |
+
+## Local AI engineering mode
+
+Install the optional local decision and generation stack:
+
+```bash
+source .venv/bin/activate
+pip install -e '.[laya,vllm]'
+```
+
+Run the offline evaluation harness with `python -m evaluation.runner` or start
+the web API with `hermes serve`. Local vLLM benchmark, NF4 quantization, and
+held-out QLoRA commands are documented in `evaluation/benchmarks/`.

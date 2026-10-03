@@ -61,3 +61,13 @@ non-negotiable invariants enforced in code and tested in
 `hermes fill` runs headed Chromium with automation flags stripped and
 realistic delays — the goal is a *human reviewing a pre-filled form*, not
 evasion for mass application. CAPTCHAs → log "blocked", never fake.
+
+## AI inference boundaries
+
+- Job descriptions, uploaded resumes, retrieved content, and generated documents
+  are delimited as untrusted prompt data at model boundaries.
+- Generated claims are matched against verified candidate evidence.
+- Unsupported claims block the application before it is tracked.
+- Model output can recommend an action, but deterministic policy code decides it.
+- No model or browser path submits an application without human review.
+- Telemetry stores hashes and operational metadata, not raw resumes or prompts.

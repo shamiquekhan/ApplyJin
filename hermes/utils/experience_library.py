@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import json
 import logging
+import math
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -23,6 +25,7 @@ logger = logging.getLogger("hermes.experience_library")
 CHROMA_DIR = DATA_DIR / "chroma_db"
 COLLECTION = "experience_bullets"
 FALLBACK_PATH = DATA_DIR / "experience_library.json"
+_TOKEN_RE = re.compile(r"[a-z0-9+#./-]+", re.IGNORECASE)
 
 
 class ExperienceLibrary:
@@ -32,10 +35,10 @@ class ExperienceLibrary:
         self._emb = get_embeddings()
         self._chroma = None
         self._collection = None
-        if use_chroma:
-            self._init_chroma()
         self._fallback_docs: dict[str, str] = {}
         self._fallback_meta: dict[str, dict] = {}
+        if use_chroma:
+            self._init_chroma()
 
     # ------------------------------------------------------- backends
 
@@ -87,16 +90,16 @@ class ExperienceLibrary:
                     for b in bullets
                 ],
             )
-        else:
-            self._fallback_docs = {b.id: b.text for b in bullets}
-            self._fallback_meta = {
-                b.id: {
-                    "skill_tags": ", ".join(b.skills),
-                    "company": b.company or "",
-                    "role": b.role or "",
-                }
-                for b in bullets
+        self._fallback_docs = {b.id: b.text for b in bullets}
+        self._fallback_meta = {
+            b.id: {
+                "skill_tags": ", ".join(b.skills),
+                "company": b.company or "",
+                "role": b.role or "",
             }
+            for b in bullets
+        }
+        if self._collection is None:
             self._save_fallback()
         return len(bullets)
 
@@ -106,38 +109,60 @@ class ExperienceLibrary:
         """Top-N bullets relevant to the query. Returns dicts with text/meta."""
         if not query_text.strip():
             return []
+        dense: dict[str, tuple[float, str, dict]] = {}
         if self._collection is not None:
             count = self._collection.count()
             if count == 0:
                 return []
             results = self._collection.query(
                 query_texts=[query_text],
-                n_results=min(n_results, count),
+                n_results=min(max(n_results * 3, 20), count),
             )
             docs = results["documents"][0] if results.get("documents") else []
             metas = (results.get("metadatas") or [[]])[0] or []
             ids = (results.get("ids") or [[]])[0] or []
-            return [
-                {"id": i, "text": d, "metadata": m or {}}
-                for i, d, m in zip(ids, docs, metas)
-            ]
+            distances = (results.get("distances") or [[]])[0] or []
+            for index, (item_id, document, metadata) in enumerate(zip(ids, docs, metas)):
+                distance = float(distances[index]) if index < len(distances) else 1.0
+                dense[item_id] = (max(0.0, 1.0 - distance), document, metadata or {})
 
-        if not self._fallback_docs:
+        if not self._fallback_docs and not dense:
             return []
-        query_vec = self._emb.embed(query_text)
-        scored = [
-            (cosine_similarity(query_vec, self._emb.embed(text)), bid, text)
-            for bid, text in self._fallback_docs.items()
-        ]
-        scored.sort(reverse=True)
+        if not dense:
+            query_vec = self._emb.embed(query_text)
+            dense = {
+                bid: (cosine_similarity(query_vec, self._emb.embed(text)), text, self._fallback_meta.get(bid, {}))
+                for bid, text in self._fallback_docs.items()
+            }
+        lexical = {
+            item_id: _lexical_score(query_text, text)
+            for item_id, text in self._fallback_docs.items()
+        }
+        lexical_rank = {
+            item_id: rank for rank, item_id in enumerate(
+                sorted(lexical, key=lexical.get, reverse=True), 1
+            ) if lexical[item_id] > 0
+        }
+        ids = set(dense) | set(lexical_rank)
+        scored = []
+        for item_id in ids:
+            if item_id in dense:
+                dense_score, text, metadata = dense[item_id]
+            else:
+                text = self._fallback_docs[item_id]
+                metadata = self._fallback_meta.get(item_id, {})
+                dense_score = 0.0
+            hybrid = 0.6 * dense_score + 0.4 * (1.0 / lexical_rank[item_id] if item_id in lexical_rank else 0.0)
+            scored.append((hybrid, item_id, text, metadata))
+        scored.sort(key=lambda item: (-item[0], item[1]))
         return [
             {
                 "id": bid,
                 "text": text,
-                "metadata": self._fallback_meta.get(bid, {}),
+                "metadata": metadata,
                 "score": score,
             }
-            for score, bid, text in scored[:n_results]
+            for score, bid, text, metadata in scored[:n_results]
         ]
 
     # ------------------------------------------------------- fallback io
@@ -162,3 +187,13 @@ class ExperienceLibrary:
 def _detect_skills(bullet_text: str, known_skills: list[str]) -> list[str]:
     lowered = bullet_text.lower()
     return [s for s in known_skills if s.lower() in lowered]
+
+
+def _lexical_score(query: str, document: str) -> float:
+    """Small BM25-like lexical signal for exact technology terminology."""
+    query_terms = set(_TOKEN_RE.findall(query.lower()))
+    document_terms = _TOKEN_RE.findall(document.lower())
+    if not query_terms or not document_terms:
+        return 0.0
+    matches = sum(document_terms.count(term) for term in query_terms)
+    return matches / math.sqrt(len(document_terms))

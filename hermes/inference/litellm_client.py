@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING
 
 from hermes.inference.llm import LLMProvider
-from hermes.utils.llm_router import LLMRouter
+
+if TYPE_CHECKING:
+    from hermes.utils.llm_router import LLMRouter
 
 
 class LiteLLMProvider(LLMProvider):
@@ -14,7 +17,7 @@ class LiteLLMProvider(LLMProvider):
 
     name = "litellm"
 
-    def __init__(self, router: LLMRouter) -> None:
+    def __init__(self, router: "LLMRouter") -> None:
         self.router = router
 
     async def generate(

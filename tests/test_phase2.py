@@ -73,6 +73,14 @@ class TestExperienceLibrary:
         lib = ExperienceLibrary(use_chroma=False)
         assert lib.query("   ") == []
 
+    def test_hybrid_query_preserves_exact_skill_matches(self, resume_md, profile):
+        lib = ExperienceLibrary(use_chroma=False)
+        parsed = parse_resume(resume_md, profile)
+        lib.index_resume(parsed)
+        hits = lib.query("XGBoost ranking", n_results=1)
+        assert "XGBoost" in hits[0]["text"]
+        assert hits[0]["score"] > 0
+
     def test_chroma_backend(self, resume_md, profile):
         pytest.importorskip("chromadb")
         parsed = parse_resume(resume_md, profile)

@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 
 from applyjin.config import load_dotenv, load_profile
 from applyjin.web.store import WebStore
+from applyjin.web.tenancy import LOCAL_USER_ID
 
 app = FastAPI(title="ApplyJin Dashboard", version="0.6.0")
 
@@ -70,13 +71,13 @@ def _router():
 
 
 def _store() -> WebStore:
-    return WebStore(DB_PATH)
+    return WebStore(DB_PATH, user_id=LOCAL_USER_ID)
 
 
 def _master() -> "MasterStore":
     from applyjin.web.master_store import MasterStore
 
-    return MasterStore(DB_PATH)
+    return MasterStore(DB_PATH, user_id=LOCAL_USER_ID)
 
 
 # Static assets
@@ -761,7 +762,7 @@ async def tailor_application(
         except ValueError:
             selected = []
 
-        master = MasterStore(DB_PATH)
+        master = _master()
         try:
             master_stats = master.stats()
             has_master = master_stats["experiences"] + master_stats["projects"] > 0
@@ -897,7 +898,7 @@ def generate_email_template(
         if not jd:
             raise HTTPException(404, "JD not found")
 
-        master = MasterStore(DB_PATH)
+        master = _master()
         try:
             profile = master.get_profile()
         finally:
@@ -1186,7 +1187,7 @@ async def copilot_chat(payload: dict) -> JSONResponse:
                 store.add_copilot_message(app_id, "user", user_message)
 
         # Master CV context
-        master = MasterStore(DB_PATH)
+        master = _master()
         try:
             snapshot = master.snapshot()
         finally:
@@ -1333,7 +1334,7 @@ async def generate_linkedin(payload: dict) -> JSONResponse:
     from applyjin.utils.llm_router import LLMUnavailable
     from applyjin.web.master_store import MasterStore
 
-    master = MasterStore(DB_PATH)
+    master = _master()
     try:
         snapshot = master.snapshot()
     finally:

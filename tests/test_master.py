@@ -19,7 +19,7 @@ from applyjin.web.tailor_v3 import (
 
 @pytest.fixture
 def master(tmp_path: Path) -> MasterStore:
-    store = MasterStore(tmp_path / "master.db")
+    store = MasterStore(tmp_path / "master.db", user_id=1)
     store.update_profile(
         full_name="Shamique Khan", email="shamique@example.com",
         linkedin="linkedin.com/in/shamique-khan", location="India",
@@ -119,7 +119,7 @@ class TestMasterStore:
         assert master.stats()["skills"] == 8
 
     def test_import_from_resume(self, tmp_path: Path):
-        store = MasterStore(tmp_path / "m.db")
+        store = MasterStore(tmp_path / "m.db", user_id=1)
         text = (
             "# Jane Doe\n\nCity | jane@x.com | linkedin.com/in/jane\n\n"
             "## Relevant Skills\n\n- Backend: Python, Docker, Kubernetes\n\n"
@@ -141,7 +141,7 @@ class TestMasterStore:
         cv = Path("data/base_resume.md")
         if not cv.exists():
             pytest.skip("base resume missing")
-        store = MasterStore(tmp_path / "m.db")
+        store = MasterStore(tmp_path / "m.db", user_id=1)
         result = import_from_resume_text(cv.read_text(), store)
         assert result["experiences"] >= 5
         assert result["projects"] >= 5
@@ -168,7 +168,7 @@ class TestImportParsing:
 
     @pytest.fixture
     def imported(self, tmp_path: Path) -> MasterStore:
-        store = MasterStore(tmp_path / "m.db")
+        store = MasterStore(tmp_path / "m.db", user_id=1)
         import_from_resume_text(self.TEXT, store)
         return store
 
@@ -198,7 +198,7 @@ class TestImportParsing:
         imported.close()
 
     def test_hash_experience_header_parses_dates_and_location(self, tmp_path: Path):
-        store = MasterStore(tmp_path / "m.db")
+        store = MasterStore(tmp_path / "m.db", user_id=1)
         import_from_resume_text(
             "# Jane Doe\n\n## Experience\n\n"
             "### SWE | Acme | 2020 - 2023 | Remote\n\n- Built things\n",

@@ -3,19 +3,27 @@
 Separate tables from the CLI tracker (applications) — the web UI is a
 hands-on tailoring workbench, the tracker is the automated pipeline log.
 Both live in the same SQLite file for one-source-of-truth backups.
+
+Ownership: every tenant table carries ``user_id`` and the store is bound to
+one user at construction time (``WebStore(path, user_id=...)``). All reads,
+writes, and deletes are scoped to that user — there is no unscoped query.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from applyjin.web.tenancy import ensure_local_user
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS web_resumes (
     id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL DEFAULT 1,
     name TEXT NOT NULL,
     content_md TEXT NOT NULL,
     raw_text TEXT NOT NULL,
@@ -25,6 +33,7 @@ CREATE TABLE IF NOT EXISTS web_resumes (
 );
 CREATE TABLE IF NOT EXISTS web_jds (
     id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL DEFAULT 1,
     title TEXT NOT NULL,
     company TEXT NOT NULL,
     content TEXT NOT NULL,
@@ -35,6 +44,7 @@ CREATE TABLE IF NOT EXISTS web_jds (
 );
 CREATE TABLE IF NOT EXISTS web_applications (
     id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL DEFAULT 1,
     resume_id INTEGER NOT NULL REFERENCES web_resumes(id),
     jd_id INTEGER NOT NULL REFERENCES web_jds(id),
     selected_keywords TEXT DEFAULT '[]',
@@ -59,6 +69,7 @@ CREATE TABLE IF NOT EXISTS waitlist (
 );
 CREATE TABLE IF NOT EXISTS copilot_messages (
     id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL DEFAULT 1,
     application_id INTEGER,
     role TEXT CHECK(role IN ('user', 'assistant')),
     content TEXT NOT NULL,
@@ -76,36 +87,39 @@ _MIGRATIONS = [
     "ALTER TABLE web_applications ADD COLUMN pipeline_status TEXT DEFAULT 'saved'",
     "ALTER TABLE web_jds ADD COLUMN ghost_score INTEGER",
     "ALTER TABLE web_jds ADD COLUMN ghost_flags_json TEXT DEFAULT ''",
+    # Ownership (pre-isolation rows are attributed to the local user).
+    "ALTER TABLE web_resumes ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE web_jds ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE web_applications ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE copilot_messages ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1",
 ]
 
 
 class WebStore:
-    def __init__(self, db_path: Path) -> None:
+    def __init__(self, db_path: Path, *, user_id: int) -> None:
+        if not isinstance(user_id, int) or user_id < 1:
+            raise ValueError(f"user_id must be a positive int, got {user_id!r}")
         db_path.parent.mkdir(parents=True, exist_ok=True)
+        ensure_local_user(db_path)
         self.conn = sqlite3.connect(str(db_path))
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(_SCHEMA)
+        self.user_id = user_id
         self._migrate()
         self.conn.commit()
 
     def _migrate(self) -> None:
-        existing_apps = {
-            row["name"]
-            for row in self.conn.execute("PRAGMA table_info(web_applications)")
-        }
-        existing_jds = {
-            row["name"]
-            for row in self.conn.execute("PRAGMA table_info(web_jds)")
-        }
         for stmt in _MIGRATIONS:
-            col = stmt.split("ADD COLUMN ")[1].split(" ")[0]
-            # Determine which table this migration targets
-            if "web_jds" in stmt:
-                if col not in existing_jds:
-                    self.conn.execute(stmt)
-            else:
-                if col not in existing_apps:
-                    self.conn.execute(stmt)
+            m = re.match(r"ALTER TABLE (\w+) ADD COLUMN (\w+)", stmt)
+            if not m:
+                continue
+            table, col = m.group(1), m.group(2)
+            try:
+                cols = {row["name"] for row in self.conn.execute(f"PRAGMA table_info({table})")}
+            except sqlite3.OperationalError:
+                continue  # table not present in this database
+            if col not in cols:
+                self.conn.execute(stmt)
 
     def close(self) -> None:
         self.conn.close()
@@ -117,9 +131,9 @@ class WebStore:
         skills: list[str], file_path: str = "",
     ) -> int:
         cur = self.conn.execute(
-            "INSERT INTO web_resumes (name, content_md, raw_text, file_path, skills) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (name, content_md, raw_text, file_path, json.dumps(skills)),
+            "INSERT INTO web_resumes (user_id, name, content_md, raw_text, file_path, skills) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (self.user_id, name, content_md, raw_text, file_path, json.dumps(skills)),
         )
         self.conn.commit()
         return cur.lastrowid
@@ -127,7 +141,8 @@ class WebStore:
     def list_resumes(self) -> list[dict]:
         rows = self.conn.execute(
             "SELECT id, name, skills, created_at, substr(raw_text, 1, 180) preview "
-            "FROM web_resumes ORDER BY id DESC"
+            "FROM web_resumes WHERE user_id = ? ORDER BY id DESC",
+            (self.user_id,),
         ).fetchall()
         return [
             {
@@ -141,7 +156,8 @@ class WebStore:
 
     def get_resume(self, resume_id: int) -> Optional[dict]:
         row = self.conn.execute(
-            "SELECT * FROM web_resumes WHERE id = ?", (resume_id,)
+            "SELECT * FROM web_resumes WHERE id = ? AND user_id = ?",
+            (resume_id, self.user_id),
         ).fetchone()
         if not row:
             return None
@@ -154,7 +170,8 @@ class WebStore:
 
     def delete_resume(self, resume_id: int) -> bool:
         cur = self.conn.execute(
-            "DELETE FROM web_resumes WHERE id = ?", (resume_id,)
+            "DELETE FROM web_resumes WHERE id = ? AND user_id = ?",
+            (resume_id, self.user_id),
         )
         self.conn.commit()
         return cur.rowcount > 0
@@ -163,8 +180,8 @@ class WebStore:
 
     def add_jd(self, title: str, company: str, content: str) -> int:
         cur = self.conn.execute(
-            "INSERT INTO web_jds (title, company, content) VALUES (?, ?, ?)",
-            (title, company, content),
+            "INSERT INTO web_jds (user_id, title, company, content) VALUES (?, ?, ?, ?)",
+            (self.user_id, title, company, content),
         )
         self.conn.commit()
         return cur.lastrowid
@@ -173,13 +190,15 @@ class WebStore:
         rows = self.conn.execute(
             "SELECT id, title, company, created_at, ghost_score, "
             "substr(content, 1, 200) preview "
-            "FROM web_jds ORDER BY id DESC"
+            "FROM web_jds WHERE user_id = ? ORDER BY id DESC",
+            (self.user_id,),
         ).fetchall()
         return [dict(r) for r in rows]
 
     def get_jd(self, jd_id: int) -> Optional[dict]:
         row = self.conn.execute(
-            "SELECT * FROM web_jds WHERE id = ?", (jd_id,)
+            "SELECT * FROM web_jds WHERE id = ? AND user_id = ?",
+            (jd_id, self.user_id),
         ).fetchone()
         if not row:
             return None
@@ -192,22 +211,24 @@ class WebStore:
 
     def save_jd_keywords(self, jd_id: int, keywords: dict) -> None:
         self.conn.execute(
-            "UPDATE web_jds SET keywords_json = ? WHERE id = ?",
-            (json.dumps(keywords), jd_id),
+            "UPDATE web_jds SET keywords_json = ? WHERE id = ? AND user_id = ?",
+            (json.dumps(keywords), jd_id, self.user_id),
         )
         self.conn.commit()
 
     def save_jd_ghost_score(self, jd_id: int, ghost_score: int, flags: list[str]) -> None:
         self.conn.execute(
-            "UPDATE web_jds SET ghost_score = ?, ghost_flags_json = ? WHERE id = ?",
-            (ghost_score, json.dumps(flags), jd_id),
+            "UPDATE web_jds SET ghost_score = ?, ghost_flags_json = ? "
+            "WHERE id = ? AND user_id = ?",
+            (ghost_score, json.dumps(flags), jd_id, self.user_id),
         )
         self.conn.commit()
 
     def get_jd_ghost_score(self, jd_id: int) -> Optional[dict]:
         row = self.conn.execute(
-            "SELECT ghost_score, ghost_flags_json FROM web_jds WHERE id = ?",
-            (jd_id,),
+            "SELECT ghost_score, ghost_flags_json FROM web_jds "
+            "WHERE id = ? AND user_id = ?",
+            (jd_id, self.user_id),
         ).fetchone()
         if not row or row["ghost_score"] is None:
             return None
@@ -219,10 +240,23 @@ class WebStore:
     # ---------------------------------------------------------- applications
 
     def create_application(self, resume_id: int, jd_id: int) -> int:
+        # Reference rows must belong to the same user.
+        owned = self.conn.execute(
+            "SELECT 1 FROM web_resumes WHERE id = ? AND user_id = ?",
+            (resume_id, self.user_id),
+        ).fetchone()
+        if not owned:
+            raise ValueError("resume not found")
+        owned = self.conn.execute(
+            "SELECT 1 FROM web_jds WHERE id = ? AND user_id = ?",
+            (jd_id, self.user_id),
+        ).fetchone()
+        if not owned:
+            raise ValueError("jd not found")
         cur = self.conn.execute(
-            "INSERT INTO web_applications (resume_id, jd_id, status, created_at) "
-            "VALUES (?, ?, 'analyzed', ?)",
-            (resume_id, jd_id, datetime.utcnow()),
+            "INSERT INTO web_applications (user_id, resume_id, jd_id, status, created_at) "
+            "VALUES (?, ?, ?, 'analyzed', ?)",
+            (self.user_id, resume_id, jd_id, datetime.utcnow()),
         )
         self.conn.commit()
         return cur.lastrowid
@@ -230,10 +264,11 @@ class WebStore:
     def update_application(self, app_id: int, **fields) -> None:
         if not fields:
             return
+        fields.pop("user_id", None)  # ownership is immutable
         cols = ", ".join(f"{k} = ?" for k in fields)
         self.conn.execute(
-            f"UPDATE web_applications SET {cols} WHERE id = ?",
-            (*fields.values(), app_id),
+            f"UPDATE web_applications SET {cols} WHERE id = ? AND user_id = ?",
+            (*fields.values(), app_id, self.user_id),
         )
         self.conn.commit()
 
@@ -241,9 +276,10 @@ class WebStore:
         row = self.conn.execute(
             "SELECT wa.*, r.name resume_name, j.title jd_title, j.company jd_company "
             "FROM web_applications wa "
-            "JOIN web_resumes r ON r.id = wa.resume_id "
-            "JOIN web_jds j ON j.id = wa.jd_id WHERE wa.id = ?",
-            (app_id,),
+            "JOIN web_resumes r ON r.id = wa.resume_id AND r.user_id = wa.user_id "
+            "JOIN web_jds j ON j.id = wa.jd_id AND j.user_id = wa.user_id "
+            "WHERE wa.id = ? AND wa.user_id = ?",
+            (app_id, self.user_id),
         ).fetchone()
         if not row:
             return None
@@ -260,9 +296,11 @@ class WebStore:
             "wa.kw_before, wa.kw_after, wa.fit_breakdown_json, wa.created_at, "
             "r.name resume_name, j.title jd_title, j.company jd_company "
             "FROM web_applications wa "
-            "JOIN web_resumes r ON r.id = wa.resume_id "
-            "JOIN web_jds j ON j.id = wa.jd_id "
-            "ORDER BY wa.id DESC"
+            "JOIN web_resumes r ON r.id = wa.resume_id AND r.user_id = wa.user_id "
+            "JOIN web_jds j ON j.id = wa.jd_id AND j.user_id = wa.user_id "
+            "WHERE wa.user_id = ? "
+            "ORDER BY wa.id DESC",
+            (self.user_id,),
         ).fetchall()
         result = []
         for r in rows:
@@ -295,8 +333,9 @@ class WebStore:
 
     def add_copilot_message(self, application_id: int, role: str, content: str) -> int:
         cur = self.conn.execute(
-            "INSERT INTO copilot_messages (application_id, role, content) VALUES (?, ?, ?)",
-            (application_id, role, content),
+            "INSERT INTO copilot_messages (user_id, application_id, role, content) "
+            "VALUES (?, ?, ?, ?)",
+            (self.user_id, application_id, role, content),
         )
         self.conn.commit()
         return cur.lastrowid
@@ -304,8 +343,8 @@ class WebStore:
     def get_copilot_history(self, application_id: int, limit: int = 50) -> list[dict]:
         rows = self.conn.execute(
             "SELECT role, content, created_at FROM copilot_messages "
-            "WHERE application_id = ? ORDER BY id DESC LIMIT ?",
-            (application_id, limit),
+            "WHERE application_id = ? AND user_id = ? ORDER BY id DESC LIMIT ?",
+            (application_id, self.user_id, limit),
         ).fetchall()
         return [dict(r) for r in reversed(rows)]
 
@@ -316,8 +355,9 @@ class WebStore:
         if status not in valid:
             raise ValueError(f"Invalid status: {status}")
         self.conn.execute(
-            "UPDATE web_applications SET pipeline_status = ? WHERE id = ?",
-            (status, app_id),
+            "UPDATE web_applications SET pipeline_status = ? "
+            "WHERE id = ? AND user_id = ?",
+            (status, app_id, self.user_id),
         )
         self.conn.commit()
 
@@ -328,9 +368,11 @@ class WebStore:
             "wa.fit_breakdown_json, "
             "r.name resume_name, j.title jd_title, j.company jd_company "
             "FROM web_applications wa "
-            "JOIN web_resumes r ON r.id = wa.resume_id "
-            "JOIN web_jds j ON j.id = wa.jd_id "
-            "ORDER BY wa.id DESC"
+            "JOIN web_resumes r ON r.id = wa.resume_id AND r.user_id = wa.user_id "
+            "JOIN web_jds j ON j.id = wa.jd_id AND j.user_id = wa.user_id "
+            "WHERE wa.user_id = ? "
+            "ORDER BY wa.id DESC",
+            (self.user_id,),
         ).fetchall()
         groups: dict[str, list[dict]] = {
             "saved": [], "tailored": [], "applied": [],

@@ -32,25 +32,13 @@ import jwt as pyjwt
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from applyjin.web.store import WebStore
+from applyjin.web.tenancy import USERS_SCHEMA as _USERS_SCHEMA
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
-GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
+GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/userinfo"
 
 TOKEN_TTL_SECONDS = 7 * 24 * 3600  # one week
-
-_USERS_SCHEMA = """
-CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY,
-    google_sub TEXT UNIQUE,
-    email TEXT NOT NULL,
-    name TEXT DEFAULT '',
-    picture TEXT DEFAULT '',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_login TIMESTAMP
-);
-"""
 
 
 def auth_enabled() -> bool:

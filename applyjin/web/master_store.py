@@ -6,13 +6,16 @@ detail that never fits on a single resume. Per-job tailored CVs are
 SELECTED from this database (top-3 experiences, top-3 projects,
 relevant skills), never invented.
 
+Ownership: every table is per-user. The store is bound to one user at
+construction time and every query is scoped to them.
+
 Tables (in data/hermes.db alongside the tracker):
-    master_profile      — one row: identity + headline + summary
+    master_profile      — one row per user: identity + headline + summary
     master_experiences  — roles: title/org/dates/location/desc + bullets
     master_projects     — name/tech/desc + bullets + link
     master_education    — degree/school/dates/details
     master_certifications — name/issuer/year
-    master_skills       — category -> skill rows
+    master_skills       — category -> skill rows (unique per user)
 """
 
 from __future__ import annotations
@@ -24,7 +27,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from applyjin.utils.skill_match import skills_in_text
+from applyjin.web.tenancy import ensure_local_user
 
 _DATE_TOKEN = r"Present|(?:[A-Za-z]{3,9}\.?\s+)?(?:19|20)\d{2}"
 
@@ -80,7 +83,7 @@ def _parse_education_header(header: list[str]) -> tuple[str, str, str, str, str]
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS master_profile (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
+    user_id INTEGER PRIMARY KEY,
     full_name TEXT DEFAULT '',
     email TEXT DEFAULT '',
     phone TEXT DEFAULT '',
@@ -95,6 +98,7 @@ CREATE TABLE IF NOT EXISTS master_profile (
 );
 CREATE TABLE IF NOT EXISTS master_experiences (
     id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL DEFAULT 1,
     title TEXT NOT NULL,
     organization TEXT DEFAULT '',
     location TEXT DEFAULT '',
@@ -107,6 +111,7 @@ CREATE TABLE IF NOT EXISTS master_experiences (
 );
 CREATE TABLE IF NOT EXISTS master_projects (
     id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL DEFAULT 1,
     name TEXT NOT NULL,
     tech TEXT DEFAULT '',
     description TEXT DEFAULT '',
@@ -117,6 +122,7 @@ CREATE TABLE IF NOT EXISTS master_projects (
 );
 CREATE TABLE IF NOT EXISTS master_education (
     id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL DEFAULT 1,
     degree TEXT NOT NULL,
     institution TEXT DEFAULT '',
     start_date TEXT DEFAULT '',
@@ -125,25 +131,104 @@ CREATE TABLE IF NOT EXISTS master_education (
 );
 CREATE TABLE IF NOT EXISTS master_certifications (
     id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL DEFAULT 1,
     name TEXT NOT NULL,
     issuer TEXT DEFAULT '',
     year TEXT DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS master_skills (
     id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL DEFAULT 1,
     category TEXT DEFAULT '',
-    name TEXT NOT NULL UNIQUE
+    name TEXT NOT NULL,
+    UNIQUE (user_id, name)
 );
 """
 
+# The singleton-profile and globally-unique-skills schemas predate per-user
+# isolation; those two tables must be rebuilt (SQLite can't add a PK or
+# change a UNIQUE constraint in place). Plain user_id columns use ALTER.
+_ALTER_TABLES = (
+    "master_experiences",
+    "master_projects",
+    "master_education",
+    "master_certifications",
+)
+
+
+def _table_sql(conn: sqlite3.Connection, name: str) -> str:
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", (name,)
+    ).fetchone()
+    return row[0] if row else ""
+
 
 class MasterStore:
-    def __init__(self, db_path: Path) -> None:
+    def __init__(self, db_path: Path, *, user_id: int) -> None:
+        if not isinstance(user_id, int) or user_id < 1:
+            raise ValueError(f"user_id must be a positive int, got {user_id!r}")
         db_path.parent.mkdir(parents=True, exist_ok=True)
+        ensure_local_user(db_path)
         self.conn = sqlite3.connect(str(db_path))
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(_SCHEMA)
-        self.conn.execute("INSERT OR IGNORE INTO master_profile (id) VALUES (1)")
+        self._migrate()
+        self.user_id = user_id
+        self.conn.execute(
+            "INSERT OR IGNORE INTO master_profile (user_id) VALUES (?)",
+            (self.user_id,),
+        )
+        self.conn.commit()
+
+    def _migrate(self) -> None:
+        # profile singleton -> per-user PK; old rows belong to user 1
+        if "CHECK (id = 1)" in _table_sql(self.conn, "master_profile"):
+            self.conn.executescript(
+                """
+                CREATE TABLE master_profile_new (
+                    user_id INTEGER PRIMARY KEY,
+                    full_name TEXT DEFAULT '', email TEXT DEFAULT '',
+                    phone TEXT DEFAULT '', location TEXT DEFAULT '',
+                    linkedin TEXT DEFAULT '', github TEXT DEFAULT '',
+                    website TEXT DEFAULT '', headline TEXT DEFAULT '',
+                    summary TEXT DEFAULT '', years_experience INTEGER DEFAULT 0,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                INSERT INTO master_profile_new (
+                    user_id, full_name, email, phone, location, linkedin,
+                    github, website, headline, summary, years_experience, updated_at
+                )
+                SELECT 1, full_name, email, phone, location, linkedin,
+                       github, website, headline, summary, years_experience, updated_at
+                FROM master_profile;
+                DROP TABLE master_profile;
+                ALTER TABLE master_profile_new RENAME TO master_profile;
+                """
+            )
+        # globally-unique skill names -> unique per user
+        if "name TEXT NOT NULL UNIQUE" in _table_sql(self.conn, "master_skills"):
+            self.conn.executescript(
+                """
+                CREATE TABLE master_skills_new (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER NOT NULL DEFAULT 1,
+                    category TEXT DEFAULT '',
+                    name TEXT NOT NULL,
+                    UNIQUE (user_id, name)
+                );
+                INSERT INTO master_skills_new (id, user_id, category, name)
+                SELECT id, 1, category, name FROM master_skills;
+                DROP TABLE master_skills;
+                ALTER TABLE master_skills_new RENAME TO master_skills;
+                """
+            )
+        # remaining master tables gain a user_id column (rows -> user 1)
+        for table in _ALTER_TABLES:
+            cols = {row["name"] for row in self.conn.execute(f"PRAGMA table_info({table})")}
+            if "user_id" not in cols:
+                self.conn.execute(
+                    f"ALTER TABLE {table} ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1"
+                )
         self.conn.commit()
 
     def close(self) -> None:
@@ -152,7 +237,9 @@ class MasterStore:
     # ---------------------------------------------------------- profile
 
     def get_profile(self) -> dict:
-        row = self.conn.execute("SELECT * FROM master_profile WHERE id = 1").fetchone()
+        row = self.conn.execute(
+            "SELECT * FROM master_profile WHERE user_id = ?", (self.user_id,)
+        ).fetchone()
         return dict(row) if row else {}
 
     def update_profile(self, **fields) -> None:
@@ -165,8 +252,8 @@ class MasterStore:
             return
         sets = ", ".join(f"{k} = ?" for k in updates)
         self.conn.execute(
-            f"UPDATE master_profile SET {sets}, updated_at = ? WHERE id = 1",
-            (*updates.values(), datetime.utcnow()),
+            f"UPDATE master_profile SET {sets}, updated_at = ? WHERE user_id = ?",
+            (*updates.values(), datetime.utcnow(), self.user_id),
         )
         self.conn.commit()
 
@@ -179,9 +266,9 @@ class MasterStore:
     ) -> int:
         cur = self.conn.execute(
             "INSERT INTO master_experiences "
-            "(title, organization, location, start_date, end_date, description, bullets_json, tags) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (title, organization, location, start_date, end_date, description,
+            "(user_id, title, organization, location, start_date, end_date, description, bullets_json, tags) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (self.user_id, title, organization, location, start_date, end_date, description,
              json.dumps(bullets or []), tags),
         )
         self.conn.commit()
@@ -189,13 +276,15 @@ class MasterStore:
 
     def list_experiences(self) -> list[dict]:
         rows = self.conn.execute(
-            "SELECT * FROM master_experiences ORDER BY id"
+            "SELECT * FROM master_experiences WHERE user_id = ? ORDER BY id",
+            (self.user_id,),
         ).fetchall()
         return [_exp_row(r) for r in rows]
 
     def delete_experience(self, exp_id: int) -> bool:
         cur = self.conn.execute(
-            "DELETE FROM master_experiences WHERE id = ?", (exp_id,)
+            "DELETE FROM master_experiences WHERE id = ? AND user_id = ?",
+            (exp_id, self.user_id),
         )
         self.conn.commit()
         return cur.rowcount > 0
@@ -208,19 +297,25 @@ class MasterStore:
     ) -> int:
         cur = self.conn.execute(
             "INSERT INTO master_projects "
-            "(name, tech, description, bullets_json, link, tags) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (name, tech, description, json.dumps(bullets or []), link, tags),
+            "(user_id, name, tech, description, bullets_json, link, tags) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (self.user_id, name, tech, description, json.dumps(bullets or []), link, tags),
         )
         self.conn.commit()
         return cur.lastrowid
 
     def list_projects(self) -> list[dict]:
-        rows = self.conn.execute("SELECT * FROM master_projects ORDER BY id").fetchall()
+        rows = self.conn.execute(
+            "SELECT * FROM master_projects WHERE user_id = ? ORDER BY id",
+            (self.user_id,),
+        ).fetchall()
         return [_proj_row(r) for r in rows]
 
     def delete_project(self, project_id: int) -> bool:
-        cur = self.conn.execute("DELETE FROM master_projects WHERE id = ?", (project_id,))
+        cur = self.conn.execute(
+            "DELETE FROM master_projects WHERE id = ? AND user_id = ?",
+            (project_id, self.user_id),
+        )
         self.conn.commit()
         return cur.rowcount > 0
 
@@ -231,27 +326,35 @@ class MasterStore:
         start_date: str = "", end_date: str = "", details: str = "",
     ) -> int:
         cur = self.conn.execute(
-            "INSERT INTO master_education (degree, institution, start_date, end_date, details) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (degree, institution, start_date, end_date, details),
+            "INSERT INTO master_education "
+            "(user_id, degree, institution, start_date, end_date, details) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (self.user_id, degree, institution, start_date, end_date, details),
         )
         self.conn.commit()
         return cur.lastrowid
 
     def list_education(self) -> list[dict]:
-        rows = self.conn.execute("SELECT * FROM master_education ORDER BY id").fetchall()
+        rows = self.conn.execute(
+            "SELECT * FROM master_education WHERE user_id = ? ORDER BY id",
+            (self.user_id,),
+        ).fetchall()
         return [dict(r) for r in rows]
 
     def add_certification(self, name: str, issuer: str = "", year: str = "") -> int:
         cur = self.conn.execute(
-            "INSERT INTO master_certifications (name, issuer, year) VALUES (?, ?, ?)",
-            (name, issuer, year),
+            "INSERT INTO master_certifications (user_id, name, issuer, year) "
+            "VALUES (?, ?, ?, ?)",
+            (self.user_id, name, issuer, year),
         )
         self.conn.commit()
         return cur.lastrowid
 
     def list_certifications(self) -> list[dict]:
-        rows = self.conn.execute("SELECT * FROM master_certifications ORDER BY id").fetchall()
+        rows = self.conn.execute(
+            "SELECT * FROM master_certifications WHERE user_id = ? ORDER BY id",
+            (self.user_id,),
+        ).fetchall()
         return [dict(r) for r in rows]
 
     # ---------------------------------------------------------- skills
@@ -261,18 +364,20 @@ class MasterStore:
         for name in names:
             try:
                 self.conn.execute(
-                    "INSERT INTO master_skills (category, name) VALUES (?, ?)",
-                    (category, name),
+                    "INSERT INTO master_skills (user_id, category, name) VALUES (?, ?, ?)",
+                    (self.user_id, category, name),
                 )
                 added += 1
             except sqlite3.IntegrityError:
-                pass  # unique
+                pass  # unique per user
         self.conn.commit()
         return added
 
     def list_skills(self) -> dict[str, list[str]]:
         rows = self.conn.execute(
-            "SELECT category, name FROM master_skills ORDER BY category, name"
+            "SELECT category, name FROM master_skills "
+            "WHERE user_id = ? ORDER BY category, name",
+            (self.user_id,),
         ).fetchall()
         out: dict[str, list[str]] = {}
         for r in rows:
@@ -280,11 +385,17 @@ class MasterStore:
         return out
 
     def all_skill_names(self) -> list[str]:
-        rows = self.conn.execute("SELECT name FROM master_skills").fetchall()
+        rows = self.conn.execute(
+            "SELECT name FROM master_skills WHERE user_id = ?",
+            (self.user_id,),
+        ).fetchall()
         return [r["name"] for r in rows]
 
     def delete_skill(self, name: str) -> bool:
-        cur = self.conn.execute("DELETE FROM master_skills WHERE name = ?", (name,))
+        cur = self.conn.execute(
+            "DELETE FROM master_skills WHERE name = ? AND user_id = ?",
+            (name, self.user_id),
+        )
         self.conn.commit()
         return cur.rowcount > 0
 

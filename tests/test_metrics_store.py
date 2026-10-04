@@ -1,4 +1,4 @@
-from hermes.inference.metrics_store import MetricsStore
+from applyjin.inference.metrics_store import MetricsStore
 
 
 def test_metrics_store_persists_only_allowed_metadata(tmp_path):

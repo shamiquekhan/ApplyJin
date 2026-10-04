@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes.resume.qa import PdfQAReport, qa_pdf, render_pdf_with_qa
+from applyjin.resume.qa import PdfQAReport, qa_pdf, render_pdf_with_qa
 
 GOOD_MD = """# Jane Doe
 jane@example.com | linkedin.com/in/jane
@@ -48,7 +48,7 @@ class TestPdfQAReport:
 @pytest.mark.skipif(_NEEDS_PDFLATEX, reason="pdflatex not installed")
 class TestQaPdfReal:
     def test_good_resume_passes(self, tmp_path: Path):
-        from hermes.utils.latex_generator import compile_tex, markdown_to_latex
+        from applyjin.utils.latex_generator import compile_tex, markdown_to_latex
 
         pdf = compile_tex(markdown_to_latex(GOOD_MD), tmp_path / "good.pdf")
         assert pdf is not None
@@ -59,7 +59,7 @@ class TestQaPdfReal:
         assert report.passed is True, report.issues
 
     def test_two_page_resume_fails(self, tmp_path: Path):
-        from hermes.utils.latex_generator import compile_tex, markdown_to_latex
+        from applyjin.utils.latex_generator import compile_tex, markdown_to_latex
 
         bullets = "\n".join(
             f"- Architected and shipped metric-{i} improvements across the platform"
@@ -77,7 +77,7 @@ class TestQaPdfReal:
         assert any("page count" in issue for issue in report.issues)
 
     def test_missing_anchors_reported(self, tmp_path: Path):
-        from hermes.utils.latex_generator import compile_tex, markdown_to_latex
+        from applyjin.utils.latex_generator import compile_tex, markdown_to_latex
 
         pdf = compile_tex(markdown_to_latex(GOOD_MD), tmp_path / "anchors.pdf")
         assert pdf is not None
@@ -93,7 +93,7 @@ class TestQaPdfReal:
     def test_profile_name_suffix_still_matches(self, tmp_path: Path):
         # Profile names can carry import suffixes ("Jane Doe — MASTER CV");
         # a clean rendering of the real name must still count as present.
-        from hermes.utils.latex_generator import compile_tex, markdown_to_latex
+        from applyjin.utils.latex_generator import compile_tex, markdown_to_latex
 
         pdf = compile_tex(markdown_to_latex(GOOD_MD), tmp_path / "suffix.pdf")
         assert pdf is not None
@@ -106,8 +106,8 @@ class TestQaPdfReal:
 
 class TestRenderPdfWithQa:
     def test_repairs_until_pass(self, tmp_path: Path, monkeypatch):
-        import hermes.resume.qa as qa_mod
-        import hermes.utils.latex_generator as lg
+        import applyjin.resume.qa as qa_mod
+        import applyjin.utils.latex_generator as lg
 
         captured: dict = {}
 
@@ -147,7 +147,7 @@ class TestRenderPdfWithQa:
         assert final_md.count("MARKERBULLET") < md.count("MARKERBULLET")
 
     def test_compile_failure_returns_none(self, tmp_path: Path, monkeypatch):
-        import hermes.utils.latex_generator as lg
+        import applyjin.utils.latex_generator as lg
 
         monkeypatch.setattr(lg, "compile_tex", lambda *a, **k: None)
         pdf, report, final_md = render_pdf_with_qa(
@@ -159,8 +159,8 @@ class TestRenderPdfWithQa:
         assert final_md == GOOD_MD  # nothing mutated
 
     def test_exhausted_repairs_returns_best_effort(self, tmp_path: Path, monkeypatch):
-        import hermes.resume.qa as qa_mod
-        import hermes.utils.latex_generator as lg
+        import applyjin.resume.qa as qa_mod
+        import applyjin.utils.latex_generator as lg
 
         def fake_compile(tex, out, cls=None):
             path = Path(out)

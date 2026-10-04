@@ -48,7 +48,7 @@ Both providers ran the exact scoring path CI gates on
 ### Production impact
 
 `DecisionAgent` gates the orchestrator pipeline (GENERATE/REVIEW/SKIP,
-`hermes/orchestrator.py:275`). Laya decisions now flow with reported
+`applyjin/orchestrator.py:275`). Laya decisions now flow with reported
 confidence, feeding the 0.60 `min_decision_confidence` gate. Cost is
 ~0.5–0.7s per decision batch **on CPU** — vLLM holds 2.95/3.6GB of VRAM, so
 Laya's GPU path is evicted (its own warning: 10–15× slower, ~200–500ms vs

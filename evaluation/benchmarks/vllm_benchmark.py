@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 from urllib.request import urlopen
 
-from hermes.inference.vllm_client import VLLMProvider
+from applyjin.inference.vllm_client import VLLMProvider
 
 
 async def _one(provider: VLLMProvider, prompt: str, max_tokens: int) -> dict[str, float | int | str]:

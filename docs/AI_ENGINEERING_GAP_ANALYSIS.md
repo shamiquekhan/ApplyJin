@@ -53,9 +53,9 @@ Does the complete system produce better, safer, faster output? That is the next 
 
 | Claim | Verdict | Evidence |
 |---|---|---|
-| Routing mixes raw milliseconds with 0–1 quality | ❌ stale | `hermes/inference/router.py` bounds `latency_score = latency_ms/latency_budget_ms` and `resource_score = resource_cost/resource_budget` into [0,1] before weighting |
+| Routing mixes raw milliseconds with 0–1 quality | ❌ stale | `applyjin/inference/router.py` bounds `latency_score = latency_ms/latency_budget_ms` and `resource_score = resource_cost/resource_budget` into [0,1] before weighting |
 | Context budgets are characters, `text[:budget]` | ⚠️ partly true | `estimate_tokens()` and `input_tokens`/`budget_tokens` exist, but truncation is inconsistent: job uses `text[:budget*4]` (budget=tokens), evidence uses `budget//4` then ×4 (budget=chars), and `budget_tokens = budget_characters//4` mislabels the budget sum. Unit accounting must be fixed |
-| Router receives `len(prompt)` characters | ❌ stale | `hermes/agents/resume_tailor.py:207` passes `context_length=context.input_tokens` (estimated tokens) |
+| Router receives `len(prompt)` characters | ❌ stale | `applyjin/agents/resume_tailor.py:207` passes `context_length=context.input_tokens` (estimated tokens) |
 | Verification only GENERAL/METRIC/DATE | ❌ stale | taxonomy now includes CERTIFICATION, EDUCATION, SKILL, COMPANY, TITLE (commit `68a5182`) |
 | Two LiteLLM/vLLM abstractions | ❌ stale | consolidated behind one `LLMProvider` per chain entry (commit `7e41b88`) |
 | Laya confidence not used by policy | ❌ true | `application_policy()` takes fit/requirement/injection only; no confidence gate |

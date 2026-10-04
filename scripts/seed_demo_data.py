@@ -8,7 +8,7 @@ for the Learning Agent to produce a real style guide. For testing only:
 The synthetic data encodes a learnable signal by design:
 - Variant B (metric-led bullets) gets interviews at ~2x the rate of A
 - Resumes containing "RAG" / "LangGraph" / metrics correlate with callbacks
-This lets `hermes learn` genuinely discover and promote the better pattern.
+This lets `applyjin learn` genuinely discover and promote the better pattern.
 """
 
 from __future__ import annotations
@@ -21,8 +21,8 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from hermes.agents.tracker import Tracker  # noqa: E402
-from hermes.models import ApplicationRecord  # noqa: E402
+from applyjin.agents.tracker import Tracker  # noqa: E402
+from applyjin.models import ApplicationRecord  # noqa: E402
 
 COMPANIES = [
     "AgentCo", "LLMLabs", "VectorWorks", "PromptCraft", "EmbedCorp",
@@ -117,7 +117,7 @@ def seed(db_path: Path = Path("data/hermes.db"), wipe: bool = False) -> None:
     tracker.conn.commit()
     tracker.close()
     print(f"Seeded {created} synthetic applications with outcomes.")
-    print("Run: .venv/bin/hermes learn --verbose")
+    print("Run: .venv/bin/applyjin learn --verbose")
 
 
 if __name__ == "__main__":

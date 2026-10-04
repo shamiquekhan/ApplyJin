@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from hermes.inference.tokens import (
+from applyjin.inference.tokens import (
     ApproximateTokenCounter,
     TokenCounter,
     counter_for_model,

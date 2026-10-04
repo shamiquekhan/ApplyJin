@@ -9,24 +9,24 @@ from pathlib import Path
 
 import pytest
 
-from hermes.agents.ab_testing import (
+from applyjin.agents.ab_testing import (
     ABResult,
     assign_variant,
     analyze_variants,
     chi_squared_yates_2x2,
 )
-from hermes.agents.learning_agent import LearningAgent, _pearson
-from hermes.agents.tracker import Tracker
-from hermes.agents.email_triage import (
+from applyjin.agents.learning_agent import LearningAgent, _pearson
+from applyjin.agents.tracker import Tracker
+from applyjin.agents.email_triage import (
     EmailTriageAgent,
     _already_advanced,
     _company_from_sender,
     _status_for,
     classify_message,
 )
-from hermes.models import ApplicationRecord
-from hermes.utils.resume_parser import parse_resume
-from hermes.config import Profile
+from applyjin.models import ApplicationRecord
+from applyjin.utils.resume_parser import parse_resume
+from applyjin.config import Profile
 
 
 # ------------------------------------------------------------ chi-squared
@@ -309,13 +309,13 @@ class TestEmailTriage:
 
 class TestTailorStyleGuide:
     def test_style_guide_in_prompt(self, tmp_path):
-        from hermes.agents.resume_tailor import ResumeTailor
-        from hermes.models import JobAnalysis, JobPosting
+        from applyjin.agents.resume_tailor import ResumeTailor
+        from applyjin.models import JobAnalysis, JobPosting
 
         class FakeRouter:
             def complete(self, prompt, **_):
                 TestTailorStyleGuide.seen_prompt = prompt
-                from hermes.models import LLMResponse
+                from applyjin.models import LLMResponse
 
                 return LLMResponse(text="tailored", model="fake", provider="fake")
 

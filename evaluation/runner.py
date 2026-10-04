@@ -12,8 +12,8 @@ from evaluation.evaluators.performance import percentile
 from evaluation.evaluators.safety import evaluate_adversarial
 from evaluation.evaluators.grounding import evaluate_grounding
 from evaluation.evaluators.trajectory import evaluate_trajectory
-from hermes.inference.heuristic_provider import HeuristicDecisionProvider
-from hermes.inference.schemas import DecisionQuestion, DecisionRequest
+from applyjin.inference.heuristic_provider import HeuristicDecisionProvider
+from applyjin.inference.schemas import DecisionQuestion, DecisionRequest
 
 
 def evaluate_case(case: dict, provider: HeuristicDecisionProvider) -> dict:

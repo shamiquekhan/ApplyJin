@@ -19,7 +19,7 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
-# Hermes data — personal data and runtime artifacts, never commit
+# ApplyJin data — personal data and runtime artifacts, never commit
 data/hermes.db
 data/hermes.db-journal
 data/hermes.db-*

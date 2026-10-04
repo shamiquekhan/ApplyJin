@@ -4,10 +4,10 @@ import asyncio
 
 import pytest
 
-from hermes.inference.context import build_context, estimate_tokens
-from hermes.inference.reliability import CircuitBreaker, CircuitOpen, call_with_retry
-from hermes.inference.router import ModelCandidate, RoutingWeights, order_candidates, utility
-from hermes.inference.model_registry import ModelRegistry
+from applyjin.inference.context import build_context, estimate_tokens
+from applyjin.inference.reliability import CircuitBreaker, CircuitOpen, call_with_retry
+from applyjin.inference.router import ModelCandidate, RoutingWeights, order_candidates, utility
+from applyjin.inference.model_registry import ModelRegistry
 
 
 def test_context_is_bounded_and_delimited():

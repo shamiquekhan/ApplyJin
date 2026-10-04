@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-from hermes.resume.coverage import (
+from applyjin.resume.coverage import (
     CoverageItem,
     requirement_covers,
     select_by_marginal_coverage,
 )
-from hermes.resume.extract import (
+from applyjin.resume.extract import (
     extract_requirements,
     requirements_from_keywords,
 )
-from hermes.resume.requirements import make_requirement
-from hermes.utils.llm_router import LLMUnavailable
-from hermes.web.selection import select_for_jd
+from applyjin.resume.requirements import make_requirement
+from applyjin.utils.llm_router import LLMUnavailable
+from applyjin.web.selection import select_for_jd
 
 KEYWORDS = {
     "hard_skills": ["Python", "LangGraph", "XGBoost"],

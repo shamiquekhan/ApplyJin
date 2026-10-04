@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from hermes.agents.cover_letter import _scrub_placeholders
-from hermes.utils.latex_generator import (
+from applyjin.agents.cover_letter import _scrub_placeholders
+from applyjin.utils.latex_generator import (
     compile_tex,
     cover_letter_to_latex,
     latex_bundle,
@@ -233,16 +233,16 @@ class TestCoverLetterName:
 
     def test_llm_letter_signed_with_name(self):
         """The LLM path must pass + scrub the name (prompt contract)."""
-        from hermes.config import Identity, Profile
-        from hermes.agents.cover_letter import CoverLetterAgent
-        from hermes.models import JobAnalysis
+        from applyjin.config import Identity, Profile
+        from applyjin.agents.cover_letter import CoverLetterAgent
+        from applyjin.models import JobAnalysis
 
         captured = {}
 
         class Router:
             def complete(self, prompt, system=""):
                 captured["prompt"] = prompt
-                from hermes.models import LLMResponse
+                from applyjin.models import LLMResponse
 
                 return LLMResponse(
                     text="Body.\n\nBest regards,\n[Your Name]",
@@ -268,11 +268,11 @@ class TestCoverLetterName:
         assert "Shamique Khan" in captured["prompt"]
 
     def test_web_pipeline_extracts_name_from_resume_header(self):
-        from hermes.web.pipeline import cover_letter as web_cover
+        from applyjin.web.pipeline import cover_letter as web_cover
 
         class Router:
             def complete(self, prompt, system=""):
-                from hermes.models import LLMResponse
+                from applyjin.models import LLMResponse
 
                 return LLMResponse(
                     text="Body.\n\nBest regards,\n[Your Name]",

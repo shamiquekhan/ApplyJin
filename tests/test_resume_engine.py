@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from hermes.resume import (
+from applyjin.resume import (
     Evidence,
     HeaderIR,
     ImportanceWeights,
@@ -18,7 +18,7 @@ from hermes.resume import (
     make_requirement,
     normalize_skill,
 )
-from hermes.resume.requirements import compute_importance
+from applyjin.resume.requirements import compute_importance
 
 
 # ---------------------------------------------------------------- requirements

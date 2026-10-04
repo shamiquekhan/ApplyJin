@@ -1,7 +1,7 @@
 import asyncio
 from types import SimpleNamespace
 
-from hermes.inference.vllm_client import VLLMProvider
+from applyjin.inference.vllm_client import VLLMProvider
 
 
 class _Completions:

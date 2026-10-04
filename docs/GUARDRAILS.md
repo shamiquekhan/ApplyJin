@@ -1,6 +1,6 @@
 # Guardrails
 
-Hermes automates preparation, never misrepresentation. These are
+ApplyJin automates preparation, never misrepresentation. These are
 non-negotiable invariants enforced in code and tested in
 `tests/test_phase1.py::TestTailorGuardrails` and beyond.
 
@@ -19,9 +19,9 @@ non-negotiable invariants enforced in code and tested in
 ## 2. No auto-submit
 
 - `ApplicationAgent.fill` fills fields and uploads files, then **stops**.
-  The submit button is never clicked by Hermes — the human does it in the
+  The submit button is never clicked by ApplyJin — the human does it in the
   open (headed) browser window.
-- `hermes fill --dry-run` opens the page without filling anything.
+- `applyjin fill --dry-run` opens the page without filling anything.
 - The web dashboard is 100% read-only; all mutations go through CLI
   commands the human runs.
 
@@ -31,7 +31,7 @@ non-negotiable invariants enforced in code and tested in
   `Tracker.add_application` — over-limit adds are blocked, not queued.
 - Recommended board etiquette: JobSpy discovery is read-only; direct
   scraping of LinkedIn/Indeed is their ToS risk — prefer the ATS board
-  APIs (`hermes scout --ats company`) which are public JSON endpoints.
+  APIs (`applyjin scout --ats company`) which are public JSON endpoints.
 
 ## 4. No duplicates
 
@@ -52,13 +52,13 @@ non-negotiable invariants enforced in code and tested in
 
 ## 6. Outreach is draft-only
 
-- `hermes outreach` writes LinkedIn notes (≤300 chars) and follow-up
-  emails to files. Hermes never sends any message.
+- `applyjin outreach` writes LinkedIn notes (≤300 chars) and follow-up
+  emails to files. ApplyJin never sends any message.
 - Follow-up drafting requires the human to decide to send.
 
 ## Detection ethics
 
-`hermes fill` runs headed Chromium with automation flags stripped and
+`applyjin fill` runs headed Chromium with automation flags stripped and
 realistic delays — the goal is a *human reviewing a pre-filled form*, not
 evasion for mass application. CAPTCHAs → log "blocked", never fake.
 

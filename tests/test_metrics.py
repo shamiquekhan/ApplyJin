@@ -1,4 +1,4 @@
-from hermes.inference.metrics import RuntimeMetrics
+from applyjin.inference.metrics import RuntimeMetrics
 
 
 def test_runtime_metrics_snapshot_tracks_p95():

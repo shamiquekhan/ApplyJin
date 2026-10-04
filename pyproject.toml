@@ -3,13 +3,13 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hermes-agent"
+name = "applyjin"
 version = "0.1.0"
 description = "Self-learning job application agent: auto-tailor + auto-fill, human clicks submit."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "CC-BY-NC-4.0" }
-authors = [{ name = "Hermes Contributors" }]
+authors = [{ name = "Shamique Khan", email = "shamiquekhan18@gmail.com" }]
 dependencies = [
     "typer>=0.12",
     "rich>=13.7",
@@ -44,10 +44,10 @@ all = [
 ]
 
 [project.scripts]
-hermes = "hermes.cli:app"
+applyjin = "applyjin.cli:app"
 
 [tool.setuptools.packages.find]
-include = ["hermes*"]
+include = ["applyjin*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

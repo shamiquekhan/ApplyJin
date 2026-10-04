@@ -72,14 +72,14 @@ Or skip this — the agent runs in heuristic mode without an LLM key.
 ### 3b. Start the backend
 
 ```bash
-hermes serve
+applyjin serve
 # → http://127.0.0.1:8000
 ```
 
 Or directly:
 
 ```bash
-python -m uvicorn hermes.web.app:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn applyjin.web.app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 The backend is now running. You can test it:
@@ -128,7 +128,7 @@ The Master CV is the foundation of everything. It's a structured database of you
 
 ```bash
 # Import an existing resume (PDF, DOCX, or Markdown)
-hermes index-resume path/to/your-resume.pdf
+applyjin index-resume path/to/your-resume.pdf
 ```
 
 This parses the resume and adds entries to the Master CV database.
@@ -169,7 +169,7 @@ Resumes in ApplyJin are the **output** — tailored documents generated from you
 ### Via the CLI
 
 ```bash
-hermes index-resume path/to/resume.pdf
+applyjin index-resume path/to/resume.pdf
 ```
 
 ---
@@ -192,10 +192,10 @@ The system will:
 
 ```bash
 # Scrape jobs from boards
-hermes scout --ats stripe,anthropic
+applyjin scout --ats stripe,anthropic
 
 # Or manually add a JD
-hermes add-jd --title "Software Engineer" --company "Acme" --url "https://..."
+applyjin add-jd --title "Software Engineer" --company "Acme" --url "https://..."
 ```
 
 ### Ghost-job score
@@ -229,10 +229,10 @@ What happens:
 
 ```bash
 # Tailor a resume for a specific JD
-hermes tailor --jd-id 1 --resume-id 1
+applyjin tailor --jd-id 1 --resume-id 1
 
 # Export as PDF
-hermes export --id 1
+applyjin export --id 1
 ```
 
 ---
@@ -397,48 +397,48 @@ Supported job boards: LinkedIn, Greenhouse, Lever, Workday, iCIMS, and generic s
 
 ```bash
 # Full pipeline (scout → analyze → score → tailor → track)
-hermes run
+applyjin run
 
 # Scout for jobs on specific ATS boards
-hermes scout --ats stripe,anthropic
+applyjin scout --ats stripe,anthropic
 
 # Index a resume into the Master CV database
-hermes index-resume path/to/resume.pdf
+applyjin index-resume path/to/resume.pdf
 
 # Tailor a resume for a specific JD
-hermes tailor --jd-id 1 --resume-id 1
+applyjin tailor --jd-id 1 --resume-id 1
 
 # Export as PDF
-hermes export --id 1
+applyjin export --id 1
 
 # Review applications (approve/reject)
-hermes review
+applyjin review
 
 # Auto-fill a form (never auto-submits)
-hermes fill --id 1
+applyjin fill --id 1
 
 # Generate interview prep
-hermes prep --id 1
+applyjin prep --id 1
 
 # Generate outreach (LinkedIn notes, follow-up emails)
-hermes outreach --id 1
+applyjin outreach --id 1
 
 # Analyze outcomes and update learning loop
-hermes learn --apply
+applyjin learn --apply
 
 # Triage email outcomes
-hermes triage-email --apply
+applyjin triage-email --apply
 
 # Start the web dashboard
-hermes dashboard          # TUI
-hermes serve              # Web API
+applyjin dashboard          # TUI
+applyjin serve              # Web API
 ```
 
 ---
 
 ## 16. Troubleshooting
 
-### "No module named hermes"
+### "No module named applyjin"
 
 ```bash
 pip install -e ".[all,dev]"
@@ -504,7 +504,7 @@ That's the point — it's warning you the listing might be fake or recycled. Rev
 | Look up visa/salary data | Research tab |
 | Chat about a match | Tailor & score → copilot panel |
 | Auto-fill a form | Chrome extension |
-| Run the full pipeline | `hermes run` |
+| Run the full pipeline | `applyjin run` |
 
 ---
 

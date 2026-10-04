@@ -30,9 +30,9 @@ chain:
     api_base: "http://localhost:11434"
 
   # Local vLLM server (OpenAI-compatible, no real key needed).
-  # Port 8001 — NOT 8000, which `hermes serve` already occupies.
+  # Port 8001 — NOT 8000, which `applyjin serve` already occupies.
   # Start it:  vllm serve Qwen/Qwen3-8B --port 8001
-  # pip install "hermes-agent[vllm]"  (brings in the openai client)
+  # pip install "applyjin-agent[vllm]"  (brings in the openai client)
   - provider: vllm
     model: openai/Qwen/Qwen3-8B
     api_base: "http://localhost:8001/v1"

@@ -6,9 +6,9 @@ import time
 
 import pytest
 
-from hermes.config import LLMConfig, ChainProvider, GenerationSettings, RetrySettings
-from hermes.models import LLMResponse
-from hermes.utils.llm_router import LLMRouter
+from applyjin.config import LLMConfig, ChainProvider, GenerationSettings, RetrySettings
+from applyjin.models import LLMResponse
+from applyjin.utils.llm_router import LLMRouter
 
 
 class _ScriptedRouter(LLMRouter):
@@ -57,7 +57,7 @@ class TestRateLimitHandling:
         router.config.chain = [
             ChainProvider(provider="ollama", model="ollama/x", api_key="k")
         ]
-        from hermes.utils.llm_router import LLMUnavailable
+        from applyjin.utils.llm_router import LLMUnavailable
 
         with pytest.raises(LLMUnavailable):
             router.complete("hi")
@@ -111,7 +111,7 @@ class TestProviderChain:
         # Pre-seed throttle times so no waiting happens in test
         from datetime import datetime, timedelta
         router._last_call = {}
-        import hermes.utils.llm_router as lr
+        import applyjin.utils.llm_router as lr
         original_sleep = time.sleep
         time.sleep = lambda s: None
         try:
@@ -132,7 +132,7 @@ class TestProviderChain:
     def test_no_providers_configured(self):
         router = LLMRouter()
         assert router.available is False
-        from hermes.utils.llm_router import LLMUnavailable
+        from applyjin.utils.llm_router import LLMUnavailable
 
         with pytest.raises(LLMUnavailable, match="No LLM provider"):
             router.complete("hi")

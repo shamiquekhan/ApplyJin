@@ -1,4 +1,4 @@
-from hermes.inference.verification import classify_claim, extract_claims, verify_claims
+from applyjin.inference.verification import classify_claim, extract_claims, verify_claims
 
 
 def test_claims_are_extracted_from_bullets_not_headings():

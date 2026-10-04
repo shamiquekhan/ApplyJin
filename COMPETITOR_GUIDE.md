@@ -13,25 +13,25 @@ on reading the real code, not the README.
 
 | Feature | Status | Where it lives |
 |---|---|---|
-| Job Scout (8+ boards via JobSpy) | Done | `hermes/agents/job_scout.py` |
-| JD Analyzer (LLM + heuristic fallback) | Done | `hermes/agents/jd_analyzer.py` |
-| Fit Scorer (4-component weighted) | Done | `hermes/agents/fit_scorer.py` |
-| Ghost-job scoring (0–100 heuristic) | Done | `hermes/utils/ghost_score.py` |
-| Selection engine (keyword + semantic ranking) | Done | `hermes/web/selection.py` |
-| Tailor v3 (LLM + guardrails) | Done | `hermes/web/tailor_v3.py` |
-| Master CV Database (SQLite) | Done | `hermes/web/master_store.py` |
-| Fuzzy deduplication (RapidFuzz) | Done | `hermes/utils/deduplicator.py` |
-| A/B learning loop + chi-squared | Done | `hermes/agents/learning_agent.py` |
-| Email triage (IMAP) | Done | `hermes/agents/email_triage.py` |
-| LaTeX PDF export | Done | `hermes/utils/latex_generator.py` |
-| Stealth Playwright auto-fill | Done | `hermes/utils/stealth_browser.py` |
-| RAG chat copilot | Done | `hermes/web/app.py:1047` |
-| Kanban pipeline (7 statuses) | Done | `hermes/web/store.py` + `KanbanBoard.tsx` |
-| LinkedIn headline/About generator | Done | `hermes/web/app.py:1207` |
-| Visa sponsorship lookup | Done | `hermes/utils/visa_sponsorship.py` |
-| Salary insights (BLS + Adzuna) | Done (buggy) | `hermes/utils/salary_insights.py` |
+| Job Scout (8+ boards via JobSpy) | Done | `applyjin/agents/job_scout.py` |
+| JD Analyzer (LLM + heuristic fallback) | Done | `applyjin/agents/jd_analyzer.py` |
+| Fit Scorer (4-component weighted) | Done | `applyjin/agents/fit_scorer.py` |
+| Ghost-job scoring (0–100 heuristic) | Done | `applyjin/utils/ghost_score.py` |
+| Selection engine (keyword + semantic ranking) | Done | `applyjin/web/selection.py` |
+| Tailor v3 (LLM + guardrails) | Done | `applyjin/web/tailor_v3.py` |
+| Master CV Database (SQLite) | Done | `applyjin/web/master_store.py` |
+| Fuzzy deduplication (RapidFuzz) | Done | `applyjin/utils/deduplicator.py` |
+| A/B learning loop + chi-squared | Done | `applyjin/agents/learning_agent.py` |
+| Email triage (IMAP) | Done | `applyjin/agents/email_triage.py` |
+| LaTeX PDF export | Done | `applyjin/utils/latex_generator.py` |
+| Stealth Playwright auto-fill | Done | `applyjin/utils/stealth_browser.py` |
+| RAG chat copilot | Done | `applyjin/web/app.py:1047` |
+| Kanban pipeline (7 statuses) | Done | `applyjin/web/store.py` + `KanbanBoard.tsx` |
+| LinkedIn headline/About generator | Done | `applyjin/web/app.py:1207` |
+| Visa sponsorship lookup | Done | `applyjin/utils/visa_sponsorship.py` |
+| Salary insights (BLS + Adzuna) | Done (buggy) | `applyjin/utils/salary_insights.py` |
 | Chrome extension (Manifest V3) | Done | `extension/` directory |
-| Google OAuth + JWT auth | Done | `hermes/web/auth.py` |
+| Google OAuth + JWT auth | Done | `applyjin/web/auth.py` |
 | 9-tab Console (React) | Done | `frontend/src/components/Console.tsx` |
 
 ---
@@ -95,7 +95,7 @@ New postings are checked hourly, scored against your profile, and surfaced in
 the Console.
 
 **Why it matters:** Right now you have to manually paste JDs or run
-`hermes scout`. RSS monitoring catches new postings automatically — the one
+`applyjin scout`. RSS monitoring catches new postings automatically — the one
 thing that makes Jobright's "smart matching" feel alive.
 
 **How it works:**

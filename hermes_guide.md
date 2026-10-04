@@ -1,6 +1,6 @@
 
 
-# Hermes: Self-Learning Job Application Agent
+# ApplyJin: Self-Learning Job Application Agent
 
 ## Complete Research Guide & Implementation Plan
 
@@ -12,7 +12,7 @@
 
 1. [Executive Summary](#1-executive-summary)
 2. [Landscape Analysis: Existing Projects](#2-landscape-analysis-existing-projects)
-3. [Hermes Architecture: The 7-Agent Pipeline](#3-hermes-architecture-the-7-agent-pipeline)
+3. [ApplyJin Architecture: The 7-Agent Pipeline](#3-applyjin-architecture-the-7-agent-pipeline)
 4. [Free Resource Stack](#4-free-resource-stack)
 5. [Implementation Plan: 4 Phases](#5-implementation-plan-4-phases)
 6. [Agent Deep Dives](#6-agent-deep-dives)
@@ -26,7 +26,7 @@
 
 ## 1. Executive Summary
 
-**Hermes** is a fully open-source, self-learning multi-agent system that automates the job search pipeline — from discovery to tailored application materials — while keeping the human in the loop for the final submit decision. It is designed to run entirely on your machine with zero subscription costs, using free LLM APIs, local models, and open-source libraries.
+**ApplyJin** is a fully open-source, self-learning multi-agent system that automates the job search pipeline — from discovery to tailored application materials — while keeping the human in the loop for the final submit decision. It is designed to run entirely on your machine with zero subscription costs, using free LLM APIs, local models, and open-source libraries.
 
 ### Core Value Proposition
 
@@ -120,9 +120,9 @@ After researching 15+ open-source job automation projects, here are the most rel
 
 ---
 
-## 3. Hermes Architecture: The 7-Agent Pipeline
+## 3. ApplyJin Architecture: The 7-Agent Pipeline
 
-Hermes uses a **LangGraph** state machine to orchestrate 7 specialized agents. LangGraph is chosen because it provides deterministic control, checkpointing, human-in-the-loop interrupts, and durable execution — essential for a regulated-like workflow where you cannot afford hallucinated submissions.
+ApplyJin uses a **LangGraph** state machine to orchestrate 7 specialized agents. LangGraph is chosen because it provides deterministic control, checkpointing, human-in-the-loop interrupts, and durable execution — essential for a regulated-like workflow where you cannot afford hallucinated submissions.
 
 ```
 +-----------------------------------------------------------------------------+
@@ -152,7 +152,7 @@ Hermes uses a **LangGraph** state machine to orchestrate 7 specialized agents. L
 ### State Schema (TypedDict)
 
 ```python
-class HermesState(TypedDict):
+class ApplyJinState(TypedDict):
     # Input
     search_config: SearchConfig      # title, location, boards, filters
     base_resume: ResumeDocument      # parsed base resume (facts)
@@ -204,7 +204,7 @@ Every component below has a **zero-cost** option. No subscriptions, no credit ca
 | **PDF Generation (alt)** | Playwright print-to-PDF                 | Built-in                                     | Headless Chrome renders HTML and prints to PDF                                                          |
 | **Tracking**             | SQLite + pandas                         | Built into Python                            | Zero-config local database. CSV export for spreadsheets                                                 |
 | **Dashboard**            | Rich / Textual                          | `pip install rich textual`                 | Terminal UI for live tracker dashboard (zero dependencies)                                              |
-| **Scheduling**           | cron / systemd / Windows Task Scheduler | Built-in OS                                  | Run Hermes on a schedule (e.g., scan twice daily)                                                       |
+| **Scheduling**           | cron / systemd / Windows Task Scheduler | Built-in OS                                  | Run ApplyJin on a schedule (e.g., scan twice daily)                                                       |
 
 ### Recommended Free LLM Strategy
 
@@ -223,16 +223,16 @@ Every component below has a **zero-cost** option. No subscriptions, no credit ca
 
 | Task                        | Deliverable                                                                              |
 | --------------------------- | ---------------------------------------------------------------------------------------- |
-| Set up project scaffold     | `hermes/` repo with Poetry/pipenv, config files                                        |
-| Integrate JobSpy            | `hermes scout --title "Python Developer" --location "Remote"` CLI                      |
+| Set up project scaffold     | `applyjin/` repo with Poetry/pipenv, config files                                        |
+| Integrate JobSpy            | `applyjin scout --title "Python Developer" --location "Remote"` CLI                      |
 | Build JD Analyzer           | Extract skills, seniority, keywords from JD using Gemini + structured output (JSON mode) |
 | Build Fit Scorer            | Compute keyword overlap + vector similarity score. Filter jobs below threshold           |
 | Build Resume Tailor v1      | Prompt-based rewriting of base resume bullets per JD. No RAG yet                         |
 | Build Cover Letter Agent v1 | Generate cover letter from JD + base resume                                              |
-| Build Tracker v1            | SQLite schema + CLI commands (`hermes tracker list`, `hermes tracker add`)           |
+| Build Tracker v1            | SQLite schema + CLI commands (`applyjin tracker list`, `applyjin tracker add`)           |
 | Human review checkpoint     | Pause pipeline after tailoring, show diff, wait for human approve/reject                 |
 
-**Milestone**: Run `hermes run` and get a queue of 10 tailored applications ready for your review.
+**Milestone**: Run `applyjin run` and get a queue of 10 tailored applications ready for your review.
 
 ### Phase 2: Intelligence (Week 3-4)
 
@@ -248,7 +248,7 @@ Every component below has a **zero-cost** option. No subscriptions, no credit ca
 | Add LiteLLM router     | Failover between Gemini -> OpenRouter -> Ollama automatically                                                                              |
 | Enhance Tracker        | Add resume variant hash, cover letter hash, ATS score, application URL to each record                                                      |
 
-**Milestone**: `hermes run --auto-fill` opens Chrome, fills 5 forms, stops at submit button. You click submit.
+**Milestone**: `applyjin run --auto-fill` opens Chrome, fills 5 forms, stops at submit button. You click submit.
 
 ### Phase 3: Learning (Week 5-6)
 
@@ -280,7 +280,7 @@ Every component below has a **zero-cost** option. No subscriptions, no credit ca
 | Docker packaging            | `docker compose up` for one-command deployment                                         |
 | Documentation               | Full README, architecture docs, contribution guide                                       |
 
-**Milestone**: `docker compose up` -> configure in browser -> `hermes run` -> check dashboard -> land interview.
+**Milestone**: `docker compose up` -> configure in browser -> `applyjin run` -> check dashboard -> land interview.
 
 ---
 
@@ -610,9 +610,9 @@ CREATE TABLE learning_patterns (
 **CLI interface**:
 
 ```bash
-hermes tracker list --status interview          # show all interviews
-hermes tracker stats --days 30                  # response rate last 30 days
-hermes tracker update --id 42 --status rejected # manual status update
+applyjin tracker list --status interview          # show all interviews
+applyjin tracker stats --days 30                  # response rate last 30 days
+applyjin tracker update --id 42 --status rejected # manual status update
 ```
 
 ### 6.8 Learning Agent
@@ -779,7 +779,7 @@ else:
 ## 9. Project File Structure
 
 ```
-hermes/
+applyjin/
 ├── README.md
 ├── LICENSE (MIT)
 ├── pyproject.toml
@@ -795,7 +795,7 @@ hermes/
 │   ├── base_resume.md           # Your canonical resume in markdown
 │   ├── base_resume.pdf          # Original PDF
 │   └── applications/            # Tailored resumes + cover letters (gitignored)
-├── hermes/
+├── applyjin/
 │   ├── __init__.py
 │   ├── cli.py                   # Click/Typer CLI entry point
 │   ├── config.py                # Pydantic settings loader
@@ -862,8 +862,8 @@ hermes/
 ### Step 1: Clone & Install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/hermes.git
-cd hermes
+git clone https://github.com/YOUR_USERNAME/applyjin.git
+cd applyjin
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
@@ -885,13 +885,13 @@ cp config/llm_config.example.yml config/llm_config.yml
 
 ```bash
 # Place your base resume in data/base_resume.md (markdown format)
-# Or use: hermes parse-resume data/my_resume.pdf
+# Or use: applyjin parse-resume data/my_resume.pdf
 ```
 
 ### Step 4: Index Your Experience (RAG)
 
 ```bash
-hermes index-resume
+applyjin index-resume
 # Parses bullets, embeds them into ChromaDB
 ```
 
@@ -899,19 +899,19 @@ hermes index-resume
 
 ```bash
 # Discovery + analysis + tailoring only (recommended for first run)
-hermes run --mode draft
+applyjin run --mode draft
 
 # With auto-fill (opens browser, fills forms, stops at submit)
-hermes run --mode fill
+applyjin run --mode fill
 
 # Dry-run (no browser, just log what would happen)
-hermes run --mode dry-run
+applyjin run --mode dry-run
 ```
 
 ### Step 6: Review & Submit
 
 ```bash
-hermes dashboard
+applyjin dashboard
 # Opens terminal UI showing today's queue
 # Review each tailored resume, approve or reject
 ```
@@ -920,7 +920,7 @@ hermes dashboard
 
 ```bash
 # After you hear back from employers:
-hermes tracker update --company "Stripe" --status interview
+applyjin tracker update --company "Stripe" --status interview
 
 # Or run email triage (optional):
 python scripts/email_triage.py
@@ -930,7 +930,7 @@ python scripts/email_triage.py
 
 ```bash
 # After 30+ applications:
-hermes learn
+applyjin learn
 # Generates style guide update + winning patterns report
 ```
 
@@ -986,9 +986,9 @@ hermes learn
 
 ---
 
-## Appendix: The "Hermes" Name
+## Appendix: The "ApplyJin" Name
 
-Hermes, the Greek messenger god, was the patron of boundaries, commerce, and cunning. He guided souls to the underworld — and in our case, guides your application through the labyrinth of ATS systems to the hiring manager's inbox. The name also nods to the "hermeneutic circle": understanding the part through the whole, and the whole through the part — exactly what the Learning Agent does with resume patterns and outcomes.
+ApplyJin, the Greek messenger god, was the patron of boundaries, commerce, and cunning. He guided souls to the underworld — and in our case, guides your application through the labyrinth of ATS systems to the hiring manager's inbox. The name also nods to the "hermeneutic circle": understanding the part through the whole, and the whole through the part — exactly what the Learning Agent does with resume patterns and outcomes.
 
 ---
 

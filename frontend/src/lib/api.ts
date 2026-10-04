@@ -1,4 +1,4 @@
-/** Full API client for the ApplyJin backend (Hermes FastAPI).
+/** Full API client for the ApplyJin backend (ApplyJin FastAPI).
  *
  * API base resolution:
  *  - dev/preview (npm run dev): "" -> Vite proxies /api to localhost:8000

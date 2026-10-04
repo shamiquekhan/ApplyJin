@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from hermes.utils.skill_match import skill_coverage, skill_in_text, skills_in_text
-from hermes.web.master_store import MasterStore, import_from_resume_text
-from hermes.web.selection import select_for_jd
-from hermes.web.tailor_v3 import (
+from applyjin.utils.skill_match import skill_coverage, skill_in_text, skills_in_text
+from applyjin.web.master_store import MasterStore, import_from_resume_text
+from applyjin.web.selection import select_for_jd
+from applyjin.web.tailor_v3 import (
     _validate,
     extract_contacts,
     generate_email_template,
@@ -278,7 +278,7 @@ class TestTailorV3:
 
         class FabricatingRouter:
             def complete(self, prompt, system="", task="generation", context_length=0):
-                from hermes.models import LLMResponse
+                from applyjin.models import LLMResponse
 
                 return LLMResponse(
                     text=(
@@ -307,7 +307,7 @@ class TestTailorV3:
 
         class Router:
             def complete(self, prompt, system="", task="generation", context_length=0):
-                from hermes.models import LLMResponse
+                from applyjin.models import LLMResponse
 
                 return LLMResponse(
                     text=(
@@ -336,15 +336,15 @@ class TestTailorV3:
         assert any("Unsupported claims" in v for v in result["guardrail_violations"])
 
     def test_token_budgets_and_context_length(self, master: MasterStore):
-        from hermes.inference.context import DEFAULT_CONTEXT_BUDGET
-        from hermes.inference.tokens import ApproximateTokenCounter
+        from applyjin.inference.context import DEFAULT_CONTEXT_BUDGET
+        from applyjin.inference.tokens import ApproximateTokenCounter
 
         report = select_for_jd(master.snapshot(), AGENT_KEYWORDS, AGENT_JD)
         captured = {}
 
         class Router:
             def complete(self, prompt, system="", task="generation", context_length=0):
-                from hermes.models import LLMResponse
+                from applyjin.models import LLMResponse
 
                 captured.update(
                     prompt=prompt, system=system, task=task,
@@ -379,7 +379,7 @@ class TestTailorV3:
 
         class IRRouter:
             def complete(self, prompt, system="", task="generation", context_length=0):
-                from hermes.models import LLMResponse
+                from applyjin.models import LLMResponse
 
                 payload = _json.loads(prompt.split("RESUME JSON:\n", 1)[1])
                 payload["experience"][0]["bullets"][0]["text"] = (
@@ -407,7 +407,7 @@ class TestTailorV3:
     def test_compose_space_drift_recost_and_refit(self, master: MasterStore):
         import json as _json
 
-        from hermes.web.tailor_v3 import _plan_for
+        from applyjin.web.tailor_v3 import _plan_for
 
         report = select_for_jd(master.snapshot(), AGENT_KEYWORDS, AGENT_JD)
         baseline = _plan_for(master.snapshot(), report).estimated_lines
@@ -415,7 +415,7 @@ class TestTailorV3:
         class ExpandingRouter:
             def complete(self, prompt, system="", task="generation",
                          context_length=0):
-                from hermes.models import LLMResponse
+                from applyjin.models import LLMResponse
 
                 payload = _json.loads(prompt.split("RESUME JSON:\n", 1)[1])
                 for entry in payload["experience"] + payload["projects"]:
@@ -447,7 +447,7 @@ class TestTailorV3:
         assert result["gate"]["passed"] is True, result["gate"]["violations"]
 
     def test_markdown_path_measured_and_compressed(self, master: MasterStore):
-        from hermes.resume.render import estimate_md_lines
+        from applyjin.resume.render import estimate_md_lines
 
         report = select_for_jd(master.snapshot(), AGENT_KEYWORDS, AGENT_JD)
         bullets = "\n".join(
@@ -464,7 +464,7 @@ class TestTailorV3:
         class MDRouter:
             def complete(self, prompt, system="", task="generation",
                          context_length=0):
-                from hermes.models import LLMResponse
+                from applyjin.models import LLMResponse
 
                 if "RESUME JSON:" in prompt:
                     return LLMResponse(
@@ -543,7 +543,7 @@ class TestMasterEndpoints:
     @pytest.fixture
     def client(self, monkeypatch, tmp_path):
         fastapi_test = pytest.importorskip("fastapi.testclient")
-        from hermes.web import app as web_module
+        from applyjin.web import app as web_module
 
         monkeypatch.setattr(web_module, "DB_PATH", tmp_path / "web.db")
         monkeypatch.setattr(web_module, "UPLOAD_DIR", tmp_path / "uploads")

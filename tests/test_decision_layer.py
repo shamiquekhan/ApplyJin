@@ -11,10 +11,10 @@ import json
 
 import pytest
 
-from hermes.inference.agent import DecisionAgent
-from hermes.inference.base import DecisionProvider, ProviderUnavailable
-from hermes.inference.heuristic_provider import HeuristicDecisionProvider
-from hermes.inference.schemas import (
+from applyjin.inference.agent import DecisionAgent
+from applyjin.inference.base import DecisionProvider, ProviderUnavailable
+from applyjin.inference.heuristic_provider import HeuristicDecisionProvider
+from applyjin.inference.schemas import (
     DecisionAnswer,
     DecisionQuestion,
     DecisionRequest,
@@ -22,8 +22,8 @@ from hermes.inference.schemas import (
     DecisionTrace,
     state_hash,
 )
-from hermes.inference.policies import REVIEW
-from hermes.orchestrator import _decision_failure_outcome
+from applyjin.inference.policies import REVIEW
+from applyjin.orchestrator import _decision_failure_outcome
 
 
 def _questions():
@@ -69,7 +69,7 @@ class _StubProvider(DecisionProvider):
         self.requests.append(request)
         if self.fail:
             raise ProviderUnavailable("stub unavailable")
-        from hermes.inference.schemas import DecisionAnswer
+        from applyjin.inference.schemas import DecisionAnswer
 
         answers = {}
         for name, q in request.questions.items():
@@ -145,33 +145,33 @@ class TestHeuristicProvider:
 
 class TestPolicy:
     def test_generate_on_strong_signals(self):
-        from hermes.inference.policies import GENERATE, application_policy
+        from applyjin.inference.policies import GENERATE, application_policy
 
         outcome = application_policy(4.5, 0.95, 0.0)
         assert outcome.action == GENERATE
         assert outcome.reasons == []
 
     def test_skip_on_low_fit(self):
-        from hermes.inference.policies import SKIP, application_policy
+        from applyjin.inference.policies import SKIP, application_policy
 
         outcome = application_policy(2.5, 0.95, 0.0)
         assert outcome.action == SKIP
 
     def test_review_on_uncertain_requirements(self):
-        from hermes.inference.policies import REVIEW, application_policy
+        from applyjin.inference.policies import REVIEW, application_policy
 
         assert application_policy(4.5, 0.60, 0.0).action == REVIEW
         assert application_policy(4.5, 0.78, 0.0).action == REVIEW
 
     def test_injection_hard_skips_before_fit(self):
-        from hermes.inference.policies import SKIP, application_policy
+        from applyjin.inference.policies import SKIP, application_policy
 
         outcome = application_policy(5.0, 0.99, 0.95)
         assert outcome.action == SKIP
         assert "injection" in outcome.reasons[0]
 
     def test_thresholds_are_configurable(self):
-        from hermes.inference.policies import (
+        from applyjin.inference.policies import (
             GENERATE,
             REVIEW,
             PolicyThresholds,
@@ -186,26 +186,26 @@ class TestPolicy:
 
 class TestConfidenceGate:
     def test_low_decision_confidence_routes_to_review(self):
-        from hermes.inference.policies import GENERATE, REVIEW, application_policy
+        from applyjin.inference.policies import GENERATE, REVIEW, application_policy
 
         assert application_policy(4.5, 0.95, 0.0, confidence=0.4).action == REVIEW
         assert application_policy(4.5, 0.95, 0.0, confidence=0.9).action == GENERATE
 
     def test_unreported_confidence_does_not_gate(self):
-        from hermes.inference.policies import GENERATE, application_policy
+        from applyjin.inference.policies import GENERATE, application_policy
 
         # Providers without confidence fields report nothing -> default 1.0.
         assert application_policy(4.5, 0.95, 0.0).action == GENERATE
 
     def test_security_and_fit_skips_outrank_uncertainty(self):
-        from hermes.inference.policies import SKIP, application_policy
+        from applyjin.inference.policies import SKIP, application_policy
 
         assert application_policy(5.0, 0.99, 0.95, confidence=0.1).action == SKIP
         assert application_policy(2.0, 0.99, 0.0, confidence=0.1).action == SKIP
 
     def test_confidence_from_answers_uses_weakest_reported_value(self):
-        from hermes.inference.policies import confidence_from_answers
-        from hermes.inference.schemas import DecisionAnswer
+        from applyjin.inference.policies import confidence_from_answers
+        from applyjin.inference.schemas import DecisionAnswer
 
         assert confidence_from_answers({}) == 1.0
         unreported = {"a": DecisionAnswer(question="a", type="noul", confidence=0.0)}
@@ -217,7 +217,7 @@ class TestConfidenceGate:
         assert confidence_from_answers(reported) == 0.4
 
     def test_outcome_from_result_gates_on_weakest_confidence(self):
-        from hermes.inference.policies import REVIEW, outcome_from_result
+        from applyjin.inference.policies import REVIEW, outcome_from_result
 
         result = DecisionResult(
             answers={
@@ -338,8 +338,8 @@ class TestStateHash:
 
 class TestVLLMRouterEntry:
     def test_vllm_entry_becomes_usable_without_key(self):
-        from hermes.config import ChainProvider, LLMConfig
-        from hermes.utils.llm_router import LLMRouter
+        from applyjin.config import ChainProvider, LLMConfig
+        from applyjin.utils.llm_router import LLMRouter
 
         cfg = LLMConfig(chain=[
             ChainProvider(provider="vllm", model="openai/Qwen/Qwen3-8B",
@@ -352,14 +352,14 @@ class TestVLLMRouterEntry:
         assert usable[0]["api_key"]  # non-empty placeholder
 
     def test_vllm_default_base_url(self):
-        from hermes.config import ChainProvider, LLMConfig
-        from hermes.utils.llm_router import LLMRouter
+        from applyjin.config import ChainProvider, LLMConfig
+        from applyjin.utils.llm_router import LLMRouter
 
         cfg = LLMConfig(chain=[
             ChainProvider(provider="vllm", model="openai/m")
         ])
         usable = LLMRouter(cfg)._usable_providers()
-        # default must not collide with `hermes serve` on 8000
+        # default must not collide with `applyjin serve` on 8000
         assert usable[0]["api_base"] == "http://localhost:8001/v1"
 
 
@@ -374,7 +374,7 @@ class TestLayaAnswerMapping:
             return {"answers": self._answers, "routing": {"model": "english"}}
 
     def _decide(self, monkeypatch, answers):
-        from hermes.inference.laya_client import LayaDecisionProvider
+        from applyjin.inference.laya_client import LayaDecisionProvider
 
         provider = LayaDecisionProvider()
         monkeypatch.setattr(provider, "_get_router", lambda: self._FakeLayaRouter(answers))

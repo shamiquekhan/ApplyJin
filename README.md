@@ -17,7 +17,7 @@
 
 ---
 
-ApplyJin (built on the **Hermes** engine) is a source-available, self-learning
+ApplyJin (built on the **ApplyJin** engine) is a source-available, self-learning
 multi-agent system that automates the job application pipeline — from discovery
 to tailored, ATS-optimized application packets — while keeping a human in the
 loop for every submit decision. It is licensed CC BY-NC 4.0 (non-commercial;
@@ -51,10 +51,10 @@ echo "GEMINI_API_KEY=your-key-here" > .env
 python -m playwright install chromium
 
 # 5. Import your resume into the master CV database
-hermes index-resume
+applyjin index-resume
 
 # 6. Start the backend (serves the API + the built-in Console)
-hermes serve                        # → http://127.0.0.1:8000
+applyjin serve                        # → http://127.0.0.1:8000
 
 # 7. In a second terminal — start the frontend dev server
 cd frontend && npm install && npm run dev  # → http://localhost:3000
@@ -76,25 +76,25 @@ paste your Gemini or Groq key → Save. No `.env` file required.
 
 | What you type | What happens |
 |---|---|
-| `hermes serve` | Starts the API + built-in Console at `localhost:8000` |
-| `hermes run --offline` | Scrape sample jobs, tailor, score, track — no LLM needed |
-| `hermes review` | Approve or reject each tailored application |
-| `hermes export --id N` | Regenerate PDF + LaTeX packet for an application |
+| `applyjin serve` | Starts the API + built-in Console at `localhost:8000` |
+| `applyjin run --offline` | Scrape sample jobs, tailor, score, track — no LLM needed |
+| `applyjin review` | Approve or reject each tailored application |
+| `applyjin export --id N` | Regenerate PDF + LaTeX packet for an application |
 
 ### CLI surface
 
 | Command | Purpose |
 |---|---|
-| `hermes run` | Full pipeline: scout → analyze → score → tailor → track |
-| `hermes scout --ats stripe,anthropic` | Greenhouse/Lever public board search |
-| `hermes index-resume` | Vector-index resume bullets (ChromaDB) |
-| `hermes learn [--apply]` | Analyze outcomes, promote style guide |
-| `hermes triage-email [--apply]` | IMAP outcome triage (dry-run default) |
-| `hermes fill --id N` | Auto-fill an application form — never submits |
-| `hermes prep --id N` | Interview prep doc (STAR stories from your facts) |
-| `hermes outreach --id N` | LinkedIn note + follow-up email drafts |
-| `hermes dashboard` / `serve` | TUI / web dashboards |
-| `hermes export --id N` | Regenerate PDFs |
+| `applyjin run` | Full pipeline: scout → analyze → score → tailor → track |
+| `applyjin scout --ats stripe,anthropic` | Greenhouse/Lever public board search |
+| `applyjin index-resume` | Vector-index resume bullets (ChromaDB) |
+| `applyjin learn [--apply]` | Analyze outcomes, promote style guide |
+| `applyjin triage-email [--apply]` | IMAP outcome triage (dry-run default) |
+| `applyjin fill --id N` | Auto-fill an application form — never submits |
+| `applyjin prep --id N` | Interview prep doc (STAR stories from your facts) |
+| `applyjin outreach --id N` | LinkedIn note + follow-up email drafts |
+| `applyjin dashboard` / `serve` | TUI / web dashboards |
+| `applyjin export --id N` | Regenerate PDFs |
 
 ---
 
@@ -197,7 +197,7 @@ accomplishments.
 ## How It Works
 
 ```
-hermes run
+applyjin run
    │
    ▼
 1. JOB SCOUT ─── scrape boards → fuzzy-dedup (company, title)
@@ -227,7 +227,7 @@ hermes run
    ▼
 9. TRACKER ───── SQLite row: fit score, ATS before/after, A/B variant
    │             pipeline status: saved → tailored → applied → ...
-   ▼  human reviews → hermes review → hermes fill (never auto-submit)
+   ▼  human reviews → applyjin review → applyjin fill (never auto-submit)
    │
    ▼ outcomes flow back (manual or email triage):
 10. LEARNING ─── keyword lift + ATS-delta correlation + A/B chi²
@@ -423,7 +423,7 @@ migrations, web API, and authentication.
 
 ```
 ApplyJin/
-├── hermes/                  # backend engine
+├── applyjin/                  # backend engine
 │   ├── agents/              # scout, analyzer, scorer, tailor, cover, tracker,
 │   │                        # application (fill), learning, triage, prep,
 │   │                        # outreach, dashboard, A/B, ATS boards

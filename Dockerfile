@@ -29,7 +29,7 @@ WORKDIR /app
 # uses ChromaDB's bundled ONNX MiniLM embedder — real semantic
 # embeddings with zero torch dependency.
 COPY pyproject.toml README.md LICENSE ./
-COPY hermes ./hermes
+COPY applyjin ./applyjin
 COPY config ./config
 COPY scripts ./scripts
 RUN pip install --no-cache-dir -e ".[scrape,pdf,web]" chromadb
@@ -45,4 +45,4 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 8000
 
 # 0.0.0.0 is required by Render's port forwarding
-CMD ["hermes", "serve", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["applyjin", "serve", "--host", "0.0.0.0", "--port", "8000"]

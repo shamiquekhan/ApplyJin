@@ -6,12 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from hermes.config import Profile, Identity, TargetProfile, Limits
-from hermes.models import JobPosting
-from hermes.agents.application_agent import FillResult, detect_ats
-from hermes.agents.jd_analyzer import heuristic_analyze
-from hermes.utils.experience_library import ExperienceLibrary
-from hermes.utils.resume_parser import parse_resume
+from applyjin.config import Profile, Identity, TargetProfile, Limits
+from applyjin.models import JobPosting
+from applyjin.agents.application_agent import FillResult, detect_ats
+from applyjin.agents.jd_analyzer import heuristic_analyze
+from applyjin.utils.experience_library import ExperienceLibrary
+from applyjin.utils.resume_parser import parse_resume
 
 
 @pytest.fixture
@@ -118,7 +118,7 @@ class TestDocxParsing:
 
 class TestTailorV2:
     def test_rag_bullet_selection(self, resume_md, profile):
-        from hermes.agents.resume_tailor import select_relevant_bullets
+        from applyjin.agents.resume_tailor import select_relevant_bullets
 
         parsed = parse_resume(resume_md, profile)
         lib = ExperienceLibrary(use_chroma=False)
@@ -136,7 +136,7 @@ class TestTailorV2:
         assert selected[0] in [b.text for b in parsed.bullets]
 
     def test_fallback_without_library(self, resume_md, profile):
-        from hermes.agents.resume_tailor import select_relevant_bullets
+        from applyjin.agents.resume_tailor import select_relevant_bullets
 
         parsed = parse_resume(resume_md, profile)
         job = JobPosting(
@@ -166,7 +166,7 @@ class TestApplicationAgent:
         assert result.submitted is False  # hard invariant
 
     def test_profile_answers(self, profile):
-        from hermes.agents.application_agent import _profile_answer
+        from applyjin.agents.application_agent import _profile_answer
 
         assert _profile_answer(profile, "first_name") == "Shamique"
         assert _profile_answer(profile, "last_name") == "Khan"
@@ -179,7 +179,7 @@ class TestApplicationAgent:
 
 class TestPDFGenerator:
     def test_markdown_to_html(self):
-        from hermes.utils.pdf_generator import markdown_to_html
+        from applyjin.utils.pdf_generator import markdown_to_html
 
         html = markdown_to_html(
             "# Jane Doe\n\njane@x.com\n\n## Experience\n\n- Built things\n"
@@ -189,7 +189,7 @@ class TestPDFGenerator:
         assert "<li>Built things</li>" in html
 
     def test_generate_pdf_file(self, tmp_path):
-        from hermes.utils.pdf_generator import generate_pdf
+        from applyjin.utils.pdf_generator import generate_pdf
 
         out = generate_pdf("# Test Resume\n\nHello world\n", tmp_path / "r.pdf")
         assert out.exists()
@@ -209,9 +209,9 @@ class TestPDFGenerator:
 class TestPipelineEndToEnd:
     def test_offline_run_with_rag(self, tmp_path, monkeypatch, resume_md, profile):
         """Full pipeline: parse -> index -> analyze -> score -> tailor -> artifacts."""
-        from hermes.agents.cover_letter import CoverLetterAgent
-        from hermes.agents.fit_scorer import FitScorer
-        from hermes.agents.resume_tailor import ResumeTailor
+        from applyjin.agents.cover_letter import CoverLetterAgent
+        from applyjin.agents.fit_scorer import FitScorer
+        from applyjin.agents.resume_tailor import ResumeTailor
 
         parsed = parse_resume(resume_md, profile)
         lib = ExperienceLibrary(use_chroma=False)

@@ -10,10 +10,10 @@ Day 7-14  Phone screen / interview scheduled            — high
 Day 30+   Offer or final rejection                      — very high
 ```
 
-Capture: `hermes triage-email --apply` (Gmail/Outlook via IMAP app
-password) or manual `hermes tracker update --id N --status interview`.
+Capture: `applyjin triage-email --apply` (Gmail/Outlook via IMAP app
+password) or manual `applyjin tracker update --id N --status interview`.
 
-## What `hermes learn` computes
+## What `applyjin learn` computes
 
 1. **Keyword lift** — for each skill present in tailored resumes,
    log-odds of appearing in interview-winning vs rejected applications.
@@ -46,17 +46,17 @@ never facts.
 
 ```bash
 python scripts/seed_demo_data.py --wipe   # 48 apps, B encoded to win
-hermes learn --verbose                    # see the verdict: B WINS, p<0.01
-hermes learn --apply                      # promote it
-hermes run --offline                      # new apps now use the guide
+applyjin learn --verbose                    # see the verdict: B WINS, p<0.01
+applyjin learn --apply                      # promote it
+applyjin run --offline                      # new apps now use the guide
 ```
 
 ## Weekly cadence
 
 ```
 scripts/learn_weekly.sh
-  ├── hermes triage-email --apply
-  └── hermes learn --apply
+  ├── applyjin triage-email --apply
+  └── applyjin learn --apply
 ```
 
 ## Evaluation-driven learning

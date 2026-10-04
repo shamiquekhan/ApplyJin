@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes.agents.ats_scout import (
+from applyjin.agents.ats_scout import (
     _looks_remote,
     _matches,
     _slugify,
@@ -15,22 +15,22 @@ from hermes.agents.ats_scout import (
     scrape_greenhouse,
     scrape_lever,
 )
-from hermes.agents.dashboard import render
-from hermes.agents.interview_prep import (
+from applyjin.agents.dashboard import render
+from applyjin.agents.interview_prep import (
     InterviewPrepAgent,
     _split_star,
     build_prep_document,
 )
-from hermes.agents.outreach_agent import (
+from applyjin.agents.outreach_agent import (
     LINKEDIN_NOTE_LIMIT,
     OutreachAgent,
     _trim_to_limit,
     draft_linkedin_note,
     draft_followup_email,
 )
-from hermes.agents.tracker import Tracker
-from hermes.config import Profile, Identity, TargetProfile, load_profile, list_profiles
-from hermes.models import ApplicationRecord, JobAnalysis, JobPosting, ResumeDocument
+from applyjin.agents.tracker import Tracker
+from applyjin.config import Profile, Identity, TargetProfile, load_profile, list_profiles
+from applyjin.models import ApplicationRecord, JobAnalysis, JobPosting, ResumeDocument
 
 
 @pytest.fixture
@@ -54,7 +54,7 @@ class TestProfiles:
         assert prof.name == "default"
 
     def test_named_profile_resolution(self, tmp_path, monkeypatch):
-        from hermes import config as cfg
+        from applyjin import config as cfg
 
         profiles_dir = tmp_path / "profiles"
         profiles_dir.mkdir()
@@ -70,14 +70,14 @@ class TestProfiles:
         assert prof.resume_path == "data/base_resume.md"
 
     def test_missing_profile_raises(self, tmp_path, monkeypatch):
-        from hermes import config as cfg
+        from applyjin import config as cfg
 
         monkeypatch.setattr(cfg, "PROFILE_DIR", tmp_path / "profiles")
         with pytest.raises(FileNotFoundError, match="not found"):
             load_profile(name="ghost")
 
     def test_list_profiles(self, tmp_path, monkeypatch):
-        from hermes import config as cfg
+        from applyjin import config as cfg
 
         d = tmp_path / "profiles"
         d.mkdir()
@@ -120,7 +120,7 @@ class TestATSScout:
             ]
         }
         monkeypatch.setattr(
-            "hermes.agents.ats_scout._http_get_json", lambda url: payload
+            "applyjin.agents.ats_scout._http_get_json", lambda url: payload
         )
         jobs = scrape_greenhouse("acme", keywords="AI")
         assert len(jobs) == 1
@@ -130,7 +130,7 @@ class TestATSScout:
 
     def test_scrape_greenhouse_no_board(self, monkeypatch):
         monkeypatch.setattr(
-            "hermes.agents.ats_scout._http_get_json", lambda url: None
+            "applyjin.agents.ats_scout._http_get_json", lambda url: None
         )
         assert scrape_greenhouse("no-such-company-xyz") == []
 
@@ -145,7 +145,7 @@ class TestATSScout:
             }
         ]
         monkeypatch.setattr(
-            "hermes.agents.ats_scout._http_get_json", lambda url: payload
+            "applyjin.agents.ats_scout._http_get_json", lambda url: payload
         )
         jobs = scrape_lever("acme")
         assert len(jobs) == 1
@@ -173,7 +173,7 @@ class TestInterviewPrep:
         resume = ResumeDocument(
             raw_text="x",
             bullets=[
-                __import__("hermes.models", fromlist=["Bullet"]).Bullet(
+                __import__("applyjin.models", fromlist=["Bullet"]).Bullet(
                     id="b1", text="Built RAG pipeline with LangGraph, +40% recall"
                 )
             ],
@@ -231,7 +231,7 @@ class TestOutreach:
     def test_llm_note_trimmed(self, profile):
         class WordyRouter:
             def complete(self, system, prompt):
-                from hermes.models import LLMResponse
+                from applyjin.models import LLMResponse
 
                 return LLMResponse(
                     text="x" * 500, model="fake", provider="fake"
@@ -289,7 +289,7 @@ class TestDashboard:
 
         render(tmp_path / "t.db", learning=False)
         out = capsys.readouterr().out
-        assert "Hermes Dashboard" in out
+        assert "ApplyJin Dashboard" in out
         assert "Pipeline Funnel" in out
         assert "Review Queue" in out
 
@@ -301,7 +301,7 @@ class TestWebDashboard:
     @pytest.fixture
     def client(self, monkeypatch, tmp_path):
         fastapi_test = pytest.importorskip("fastapi.testclient")
-        from hermes.web import app as web_module
+        from applyjin.web import app as web_module
 
         monkeypatch.setattr(web_module, "DB_PATH", tmp_path / "web.db")
         monkeypatch.setattr(web_module, "UPLOAD_DIR", tmp_path / "uploads")
@@ -314,13 +314,13 @@ class TestWebDashboard:
         resp = client.get("/")
         assert resp.status_code == 200
         # React build when present, legacy dashboard page otherwise
-        assert "Hermes Dashboard" in resp.text or "ApplyJin" in resp.text
+        assert "ApplyJin Dashboard" in resp.text or "ApplyJin" in resp.text
 
     def test_dashboard_route(self, client):
         resp = client.get("/dashboard")
         assert resp.status_code == 200
         # React Console when the frontend is built; legacy workbench otherwise
-        assert "ApplyJin" in resp.text or "Hermes Dashboard" in resp.text
+        assert "ApplyJin" in resp.text or "ApplyJin Dashboard" in resp.text
 
     def test_public_stats(self, client):
         resp = client.get("/api/public/stats")
@@ -512,17 +512,17 @@ class TestWebDashboard:
         assert "applyjin_decision_latency_p95_ms" in response.text
 
     def test_decisions_exposes_hashed_trace_metadata(self, client, tmp_path, monkeypatch):
-        from hermes.inference.agent import DecisionAgent
+        from applyjin.inference.agent import DecisionAgent
 
         traces = tmp_path / "traces.jsonl"
         agent = DecisionAgent(traces_path=traces)
         agent._persist(
-            __import__("hermes.inference.schemas", fromlist=["DecisionTrace"]).DecisionTrace(
+            __import__("applyjin.inference.schemas", fromlist=["DecisionTrace"]).DecisionTrace(
                 decision_id="d1", input_state_hash="abc123", action="REVIEW"
             )
         )
         agent.metrics_store.close()
-        import hermes.inference.agent as decision_agent
+        import applyjin.inference.agent as decision_agent
         monkeypatch.setattr(decision_agent, "TRACES_PATH", traces)
         response = client.get("/api/decisions?limit=1")
         assert response.status_code == 200

@@ -5,13 +5,13 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
-import hermes.utils.llm_router as lr
-from hermes.config import ChainProvider, LLMConfig, RetrySettings
-from hermes.inference.litellm_client import LiteLLMProvider
-from hermes.inference.llm import run_provider
-from hermes.inference.metrics import INFERENCE_METRICS
-from hermes.inference.vllm_client import VLLMProvider
-from hermes.utils.llm_router import LLMRouter
+import applyjin.utils.llm_router as lr
+from applyjin.config import ChainProvider, LLMConfig, RetrySettings
+from applyjin.inference.litellm_client import LiteLLMProvider
+from applyjin.inference.llm import run_provider
+from applyjin.inference.metrics import INFERENCE_METRICS
+from applyjin.inference.vllm_client import VLLMProvider
+from applyjin.utils.llm_router import LLMRouter
 
 
 def _vllm_router() -> LLMRouter:

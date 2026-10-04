@@ -9,7 +9,7 @@ JobScout ──> JDAnalyzer ──> FitScorer ──> ResumeTailor ──> Cover
                 fallback)       seniority)     guardrails)    template
                                                                 fallback)
                                                     │
-                                       HumanReview (hermes review) ◄─┘
+                                       HumanReview (applyjin review) ◄─┘
                                                     │
                                     ApplicationAgent (fill, never submit)
                                                     │
@@ -25,27 +25,27 @@ JobScout ──> JDAnalyzer ──> FitScorer ──> ResumeTailor ──> Cover
 
 | Module | File | Role |
 |---|---|---|
-| Config | `hermes/config.py` | Pydantic models over YAML; env keys override file |
-| Models | `hermes/models/__init__.py` | JobPosting, JobAnalysis, ScoredJob, Resume, Application |
-| LLM router | `hermes/utils/llm_router.py` | LiteLLM chain with failover (Gemini→OpenRouter→Ollama) |
-| Embeddings | `hermes/utils/embeddings.py` | MiniLM (torch) → ONNX MiniLM → hashed fallback |
-| Experience library | `hermes/utils/experience_library.py` | ChromaDB bullet store; JSON fallback |
-| ATS scorer | `hermes/utils/ats_scorer.py` | fuzzy keyword match + cosine similarity |
-| PDF | `hermes/utils/pdf_generator.py` | Playwright → WeasyPrint → HTML chain |
-| Agents | `hermes/agents/*` | scout, analyzer, scorer, tailor, cover, application, tracker, learning, triage, prep, outreach, dashboard, A/B |
-| Web | `hermes/web/app.py` | FastAPI read-only dashboard |
-| CLI | `hermes/cli.py` | Typer commands; orchestrator wires agents |
+| Config | `applyjin/config.py` | Pydantic models over YAML; env keys override file |
+| Models | `applyjin/models/__init__.py` | JobPosting, JobAnalysis, ScoredJob, Resume, Application |
+| LLM router | `applyjin/utils/llm_router.py` | LiteLLM chain with failover (Gemini→OpenRouter→Ollama) |
+| Embeddings | `applyjin/utils/embeddings.py` | MiniLM (torch) → ONNX MiniLM → hashed fallback |
+| Experience library | `applyjin/utils/experience_library.py` | ChromaDB bullet store; JSON fallback |
+| ATS scorer | `applyjin/utils/ats_scorer.py` | fuzzy keyword match + cosine similarity |
+| PDF | `applyjin/utils/pdf_generator.py` | Playwright → WeasyPrint → HTML chain |
+| Agents | `applyjin/agents/*` | scout, analyzer, scorer, tailor, cover, application, tracker, learning, triage, prep, outreach, dashboard, A/B |
+| Web | `applyjin/web/app.py` | FastAPI read-only dashboard |
+| CLI | `applyjin/cli.py` | Typer commands; orchestrator wires agents |
 
 ## Data flow
 
-1. `hermes run` → orchestrator: scout jobs → per job: analyze → score →
+1. `applyjin run` → orchestrator: scout jobs → per job: analyze → score →
    filter → assign A/B variant → tailor (RAG + style guide) → cover letter →
    ATS before/after → artifacts (`data/applications/<job>/`) → tracker row
    (`pending_review`).
-2. `hermes review` → human approves/rejects each. Approved = submit manually
-   (optionally `hermes fill` pre-fills the form).
-3. Outcomes flow back via `hermes tracker update` or `hermes triage-email`.
-4. `hermes learn` → lift analysis + ATS-delta correlation + A/B chi² →
+2. `applyjin review` → human approves/rejects each. Approved = submit manually
+   (optionally `applyjin fill` pre-fills the form).
+3. Outcomes flow back via `applyjin tracker update` or `applyjin triage-email`.
+4. `applyjin learn` → lift analysis + ATS-delta correlation + A/B chi² →
    style guide version → injected into the next tailor run.
 
 ## Storage

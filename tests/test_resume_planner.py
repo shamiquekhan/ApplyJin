@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from hermes.resume.ir import (
+from applyjin.resume.ir import (
     CertificationIR,
     EducationIR,
     ExperienceIR,
@@ -10,14 +10,14 @@ from hermes.resume.ir import (
     ResumeBullet,
     ResumeIR,
 )
-from hermes.resume.planner import (
+from applyjin.resume.planner import (
     PAGE_LINE_BUDGET,
     SECTION_ORDER,
     ResumePlan,
     ir_from_selection,
     plan_resume,
 )
-from hermes.resume.requirements import make_requirement
+from applyjin.resume.requirements import make_requirement
 
 SNAPSHOT = {
     "profile": {
@@ -157,7 +157,7 @@ class TestPlanResume:
 
     def test_projects_drop_before_experience_on_tie(self):
         ir = self._bulky_ir()
-        from hermes.resume.ir import ProjectIR
+        from applyjin.resume.ir import ProjectIR
 
         ir.projects.append(
             ProjectIR(id="9", name="P", bullets=[
@@ -219,7 +219,7 @@ class TestFixedSectionCaps:
 
     def test_summary_trimmed_at_word_boundary(self):
         ir = ResumeIR(header=HeaderIR(name="X"))
-        from hermes.resume.ir import SummaryIR
+        from applyjin.resume.ir import SummaryIR
 
         ir.summary = SummaryIR(text=" ".join(["word"] * 60))
         plan = plan_resume(ir, [], page_lines=46)

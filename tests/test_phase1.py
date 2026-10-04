@@ -7,20 +7,20 @@ from pathlib import Path
 
 import pytest
 
-from hermes.config import Profile, TargetProfile
-from hermes.models import ApplicationRecord, Bullet, JobPosting, ResumeDocument
-from hermes.agents.jd_analyzer import heuristic_analyze
-from hermes.agents.fit_scorer import FitScorer
-from hermes.agents.resume_tailor import select_relevant_bullets, validate_tailored
-from hermes.agents.tracker import Tracker
-from hermes.orchestrator import _verification_failure_reason
-from hermes.utils.ats_scorer import (
+from applyjin.config import Profile, TargetProfile
+from applyjin.models import ApplicationRecord, Bullet, JobPosting, ResumeDocument
+from applyjin.agents.jd_analyzer import heuristic_analyze
+from applyjin.agents.fit_scorer import FitScorer
+from applyjin.agents.resume_tailor import select_relevant_bullets, validate_tailored
+from applyjin.agents.tracker import Tracker
+from applyjin.orchestrator import _verification_failure_reason
+from applyjin.utils.ats_scorer import (
     keyword_match_score,
     missing_keywords,
     seniority_match,
     experience_match,
 )
-from hermes.utils.deduplicator import deduplicate_jobs
+from applyjin.utils.deduplicator import deduplicate_jobs
 
 
 # ---------------------------------------------------------------- fixtures
@@ -35,7 +35,7 @@ def profile() -> Profile:
             "infra": ["Docker", "Kubernetes", "AWS", "PostgreSQL", "Redis"],
             "practices": ["CI/CD", "TDD", "observability"],
         },
-        limits=__import__("hermes.config", fromlist=["Limits"]).Limits(
+        limits=__import__("applyjin.config", fromlist=["Limits"]).Limits(
             max_applications_per_day=3
         ),
     )
@@ -234,12 +234,12 @@ class TestTailorGuardrails:
 
     def test_empty_llm_response_falls_back(self, resume, backend_job):
         """A provider returning empty text must never produce an empty file."""
-        from hermes.agents.resume_tailor import ResumeTailor
-        from hermes.models import JobAnalysis
+        from applyjin.agents.resume_tailor import ResumeTailor
+        from applyjin.models import JobAnalysis
 
         class EmptyRouter:
             def complete(self, prompt, **_):
-                from hermes.models import LLMResponse
+                from applyjin.models import LLMResponse
 
                 return LLMResponse(text="", model="empty", provider="empty")
 
@@ -306,7 +306,7 @@ class TestTracker:
 
 class TestEmbeddings:
     def test_hashed_fallback_deterministic(self):
-        from hermes.utils.embeddings import HashedEmbeddings, cosine_similarity
+        from applyjin.utils.embeddings import HashedEmbeddings, cosine_similarity
 
         emb = HashedEmbeddings()
         a = emb.embed("python kubernetes docker")
@@ -317,7 +317,7 @@ class TestEmbeddings:
         assert cosine_similarity(a, c) < 0.5
 
     def test_norm(self):
-        from hermes.utils.embeddings import HashedEmbeddings
+        from applyjin.utils.embeddings import HashedEmbeddings
 
         vec = HashedEmbeddings().embed("some text here")
         assert abs(sum(x * x for x in vec) - 1.0) < 1e-6

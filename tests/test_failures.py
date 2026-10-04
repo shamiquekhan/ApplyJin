@@ -1,4 +1,4 @@
-from hermes.inference.failures import FailureCode, classify_failure
+from applyjin.inference.failures import FailureCode, classify_failure
 
 
 def test_failure_taxonomy_classifies_provider_errors():

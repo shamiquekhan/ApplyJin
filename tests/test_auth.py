@@ -14,7 +14,7 @@ def auth_env(monkeypatch, tmp_path):
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "test-client-id.apps.googleusercontent.com")
     monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "test-secret")
     monkeypatch.setenv("AUTH_SECRET", "unit-test-secret")
-    monkeypatch.setattr("hermes.web.auth._SECRET", None)
+    monkeypatch.setattr("applyjin.web.auth._SECRET", None)
     return tmp_path
 
 
@@ -22,12 +22,12 @@ def auth_env(monkeypatch, tmp_path):
 def open_env(monkeypatch):
     """Auth DISABLED (local zero-config mode)."""
     monkeypatch.delenv("GOOGLE_CLIENT_ID", raising=False)
-    monkeypatch.setattr("hermes.web.auth._SECRET", None)
+    monkeypatch.setattr("applyjin.web.auth._SECRET", None)
 
 
 class TestJWT:
     def test_roundtrip(self, auth_env):
-        from hermes.web.auth import create_token, verify_token
+        from applyjin.web.auth import create_token, verify_token
 
         token = create_token(42, "user@example.com")
         payload = verify_token(token)
@@ -35,14 +35,14 @@ class TestJWT:
         assert payload["email"] == "user@example.com"
 
     def test_tampered_token_rejected(self, auth_env):
-        from hermes.web.auth import create_token, verify_token
+        from applyjin.web.auth import create_token, verify_token
 
         token = create_token(1, "a@b.c")
         with pytest.raises(ValueError):
             verify_token(token[:-2] + "xx")  # corrupted signature
 
     def test_expired_token_rejected(self, auth_env):
-        from hermes.web.auth import verify_token
+        from applyjin.web.auth import verify_token
 
         import jwt as pyjwt
         import time as _time
@@ -61,7 +61,7 @@ class TestJWT:
             verify_token(expired)
 
     def test_wrong_secret_rejected(self, auth_env, monkeypatch):
-        from hermes.web import auth
+        from applyjin.web import auth
 
         token = auth.create_token(1, "a@b.c")
         monkeypatch.setattr(auth, "_SECRET", "different-secret")
@@ -71,13 +71,13 @@ class TestJWT:
 
 class TestStateCSRF:
     def test_state_validates(self, auth_env):
-        from hermes.web.auth import check_state, make_state
+        from applyjin.web.auth import check_state, make_state
 
         state = make_state()
         assert check_state(state)
 
     def test_forged_state_rejected(self, auth_env):
-        from hermes.web.auth import check_state
+        from applyjin.web.auth import check_state
 
         assert not check_state("12345.deadbeef")
         assert not check_state("")
@@ -85,7 +85,7 @@ class TestStateCSRF:
     def test_expired_state_rejected(self, auth_env, monkeypatch):
         import time as _time
 
-        from hermes.web.auth import check_state, make_state
+        from applyjin.web.auth import check_state, make_state
 
         state = make_state()
         real_time = _time.time
@@ -95,7 +95,7 @@ class TestStateCSRF:
 
 class TestUsers:
     def test_upsert_and_get(self, auth_env, tmp_path):
-        from hermes.web.auth import get_user, upsert_user
+        from applyjin.web.auth import get_user, upsert_user
 
         db = tmp_path / "users.db"
         uid = upsert_user(db, "g-sub-1", "new@example.com", "New User", "http://pic")
@@ -114,7 +114,7 @@ class TestUsers:
         assert uid3 == 2
 
     def test_get_missing_user(self, auth_env, tmp_path):
-        from hermes.web.auth import get_user
+        from applyjin.web.auth import get_user
 
         assert get_user(tmp_path / "u.db", 999) is None
 
@@ -123,7 +123,7 @@ class TestAuthGate:
     @pytest.fixture
     def client(self, monkeypatch, tmp_path):
         fastapi_test = pytest.importorskip("fastapi.testclient")
-        from hermes.web import app as web_module
+        from applyjin.web import app as web_module
 
         monkeypatch.setattr(web_module, "DB_PATH", tmp_path / "web.db")
         monkeypatch.setattr(web_module, "UPLOAD_DIR", tmp_path / "uploads")
@@ -134,7 +134,7 @@ class TestAuthGate:
     def test_gate_blocks_when_configured(self, client, monkeypatch):
         """Every private /api route 401s without a token when auth is on."""
         monkeypatch.setenv("GOOGLE_CLIENT_ID", "x")
-        monkeypatch.setattr("hermes.web.auth._SECRET", None)
+        monkeypatch.setattr("applyjin.web.auth._SECRET", None)
         assert client.get("/api/resumes").status_code == 401
         assert client.get("/api/master/stats").status_code == 401
         assert client.get("/api/applications").status_code == 401
@@ -147,15 +147,15 @@ class TestAuthGate:
 
     def test_gate_open_when_not_configured(self, client, monkeypatch):
         monkeypatch.delenv("GOOGLE_CLIENT_ID", raising=False)
-        monkeypatch.setattr("hermes.web.auth._SECRET", None)
+        monkeypatch.setattr("applyjin.web.auth._SECRET", None)
         assert client.get("/api/resumes").status_code == 200
         assert client.get("/api/public/stats").status_code == 200
 
     def test_valid_token_passes_gate(self, client, monkeypatch, tmp_path):
         monkeypatch.setenv("GOOGLE_CLIENT_ID", "x")
-        monkeypatch.setattr("hermes.web.auth._SECRET", None)
-        from hermes.web import auth as auth_mod
-        from hermes.web import app as web_module
+        monkeypatch.setattr("applyjin.web.auth._SECRET", None)
+        from applyjin.web import auth as auth_mod
+        from applyjin.web import app as web_module
 
         uid = auth_mod.upsert_user(
             web_module.DB_PATH, "sub-9", "me@example.com", "Me", ""
@@ -170,8 +170,8 @@ class TestAuthGate:
 
     def test_unknown_user_token_401s(self, client, monkeypatch):
         monkeypatch.setenv("GOOGLE_CLIENT_ID", "x")
-        monkeypatch.setattr("hermes.web.auth._SECRET", None)
-        from hermes.web import auth as auth_mod
+        monkeypatch.setattr("applyjin.web.auth._SECRET", None)
+        from applyjin.web import auth as auth_mod
 
         token = auth_mod.create_token(12345, "ghost@example.com")  # no such user row
         resp = client.get("/api/resumes", headers={"Authorization": f"Bearer {token}"})
@@ -179,7 +179,7 @@ class TestAuthGate:
 
     def test_google_login_redirects(self, client, monkeypatch):
         monkeypatch.setenv("GOOGLE_CLIENT_ID", "my-app.apps.googleusercontent.com")
-        monkeypatch.setattr("hermes.web.auth._SECRET", None)
+        monkeypatch.setattr("applyjin.web.auth._SECRET", None)
         resp = client.get("/api/auth/google", follow_redirects=False)
         assert resp.status_code in (301, 302, 307, 308)
         location = resp.headers["location"]
@@ -190,7 +190,7 @@ class TestAuthGate:
     def test_callback_bad_state_redirects_error(self, client, monkeypatch):
         monkeypatch.setenv("GOOGLE_CLIENT_ID", "x")
         monkeypatch.setenv("FRONTEND_URL", "https://fe.example.com")
-        monkeypatch.setattr("hermes.web.auth._SECRET", None)
+        monkeypatch.setattr("applyjin.web.auth._SECRET", None)
         resp = client.get(
             "/api/auth/google/callback?code=x&state=forged.1234",
             follow_redirects=False,

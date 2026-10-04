@@ -1,7 +1,7 @@
 import asyncio
 
-from hermes.inference.litellm_client import RouterProvider
-from hermes.models import LLMResponse
+from applyjin.inference.litellm_client import RouterProvider
+from applyjin.models import LLMResponse
 
 
 class _Router:

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import json
 
-from hermes.resume.composer import compose_ir
-from hermes.resume.gate import coverage_ratio, gate
-from hermes.resume.planner import ir_from_selection, plan_resume
-from hermes.resume.render import render_markdown
-from hermes.resume.requirements import make_requirement
+from applyjin.resume.composer import compose_ir
+from applyjin.resume.gate import coverage_ratio, gate
+from applyjin.resume.planner import ir_from_selection, plan_resume
+from applyjin.resume.render import render_markdown
+from applyjin.resume.requirements import make_requirement
 
 SNAPSHOT = {
     "profile": {

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from hermes.resume.repair import compress_to_fit, repair_step
-from hermes.resume.render import estimate_md_lines
+from applyjin.resume.repair import compress_to_fit, repair_step
+from applyjin.resume.render import estimate_md_lines
 
 LONG_SUMMARY = " ".join(["word"] * 60)
 

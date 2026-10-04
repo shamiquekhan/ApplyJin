@@ -7,8 +7,8 @@ const STEPS = [
   { num: "01", title: "Clone & install", code: "git clone https://github.com/shamiquekhan/ApplyJin.git && cd ApplyJin\npython3 -m venv .venv && source .venv/bin/activate\npip install -e \".[all,dev]\"" },
   { num: "02", title: "Add API key", code: "echo 'GEMINI_API_KEY=your-key' > .env\n# Or skip — heuristic mode works without it" },
   { num: "03", title: "Install browser", code: "python -m playwright install chromium" },
-  { num: "04", title: "Import your resume", code: "hermes index-resume path/to/resume.pdf" },
-  { num: "05", title: "Start backend", code: "hermes serve  # → http://localhost:8000" },
+  { num: "04", title: "Import your resume", code: "applyjin index-resume path/to/resume.pdf" },
+  { num: "05", title: "Start backend", code: "applyjin serve  # → http://localhost:8000" },
   { num: "06", title: "Start frontend", code: "cd frontend && npm install && npm run dev\n# → http://localhost:3000" },
   { num: "07", title: "Open the Console", code: "Visit http://localhost:3000/dashboard\n→ Master CV tab: add your career data\n→ Resumes tab: upload existing resumes\n→ JDs tab: paste job descriptions\n→ Tailor & score: generate tailored resumes\n→ Pipeline: track your applications" },
 ];
@@ -74,19 +74,19 @@ export function TutorialPage() {
           <div className="space-y-3 text-sm">
             <div className="flex items-center gap-3">
               <Terminal className="w-4 h-4 text-primary/50 shrink-0" />
-              <span className="text-primary/60"><code className="bg-primary/10 px-1.5 py-0.5 rounded text-xs">hermes run</code> — Full pipeline: scout → analyze → score → tailor → track</span>
+              <span className="text-primary/60"><code className="bg-primary/10 px-1.5 py-0.5 rounded text-xs">applyjin run</code> — Full pipeline: scout → analyze → score → tailor → track</span>
             </div>
             <div className="flex items-center gap-3">
               <Terminal className="w-4 h-4 text-primary/50 shrink-0" />
-              <span className="text-primary/60"><code className="bg-primary/10 px-1.5 py-0.5 rounded text-xs">hermes scout --ats stripe</code> — Search specific ATS boards</span>
+              <span className="text-primary/60"><code className="bg-primary/10 px-1.5 py-0.5 rounded text-xs">applyjin scout --ats stripe</code> — Search specific ATS boards</span>
             </div>
             <div className="flex items-center gap-3">
               <Terminal className="w-4 h-4 text-primary/50 shrink-0" />
-              <span className="text-primary/60"><code className="bg-primary/10 px-1.5 py-0.5 rounded text-xs">hermes review</code> — Approve or reject applications</span>
+              <span className="text-primary/60"><code className="bg-primary/10 px-1.5 py-0.5 rounded text-xs">applyjin review</code> — Approve or reject applications</span>
             </div>
             <div className="flex items-center gap-3">
               <Terminal className="w-4 h-4 text-primary/50 shrink-0" />
-              <span className="text-primary/60"><code className="bg-primary/10 px-1.5 py-0.5 rounded text-xs">hermes fill --id 1</code> — Auto-fill a form (never auto-submits)</span>
+              <span className="text-primary/60"><code className="bg-primary/10 px-1.5 py-0.5 rounded text-xs">applyjin fill --id 1</code> — Auto-fill a form (never auto-submits)</span>
             </div>
             <div className="flex items-center gap-3">
               <CheckCircle className="w-4 h-4 text-emerald-500/50 shrink-0" />

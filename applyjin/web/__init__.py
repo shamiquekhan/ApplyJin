@@ -1,0 +1,1 @@
+"""ApplyJin web dashboard package."""

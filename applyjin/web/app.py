@@ -70,14 +70,29 @@ def _router():
     return router if router.available else None
 
 
-def _store() -> WebStore:
-    return WebStore(DB_PATH, user_id=LOCAL_USER_ID)
+def _current_user_id(request: Request) -> int:
+    """The session principal: signed-in user, or local user in open mode."""
+    if not _auth.auth_enabled():
+        return LOCAL_USER_ID
+    user = getattr(request.state, "user", None)
+    if not isinstance(user, dict) or "id" not in user:
+        raise HTTPException(401, "Sign in required")
+    return int(user["id"])
 
 
-def _master() -> "MasterStore":
+def _store(request: Request) -> WebStore:
+    return WebStore(DB_PATH, user_id=_current_user_id(request))
+
+
+def _master(request: Request) -> "MasterStore":
     from applyjin.web.master_store import MasterStore
 
-    return MasterStore(DB_PATH, user_id=LOCAL_USER_ID)
+    return MasterStore(DB_PATH, user_id=_current_user_id(request))
+
+
+def _global_store() -> WebStore:
+    """Store for public endpoints that only touch global tables (waitlist)."""
+    return WebStore(DB_PATH, user_id=LOCAL_USER_ID)
 
 
 # Static assets
@@ -289,8 +304,8 @@ async def update_llm_settings(payload: dict) -> JSONResponse:
 
 
 @app.get("/api/master/profile")
-def master_get_profile() -> JSONResponse:
-    store = _master()
+def master_get_profile(request: Request) -> JSONResponse:
+    store = _master(request)
     try:
         return JSONResponse(store.get_profile())
     finally:
@@ -298,8 +313,8 @@ def master_get_profile() -> JSONResponse:
 
 
 @app.put("/api/master/profile")
-async def master_update_profile(profile: dict) -> JSONResponse:
-    store = _master()
+async def master_update_profile(request: Request, profile: dict) -> JSONResponse:
+    store = _master(request)
     try:
         store.update_profile(**profile)
         return JSONResponse(store.get_profile())
@@ -308,8 +323,8 @@ async def master_update_profile(profile: dict) -> JSONResponse:
 
 
 @app.get("/api/master/stats")
-def master_stats() -> JSONResponse:
-    store = _master()
+def master_stats(request: Request) -> JSONResponse:
+    store = _master(request)
     try:
         return JSONResponse(store.stats())
     finally:
@@ -317,8 +332,8 @@ def master_stats() -> JSONResponse:
 
 
 @app.get("/api/master/experiences")
-def master_list_experiences() -> JSONResponse:
-    store = _master()
+def master_list_experiences(request: Request) -> JSONResponse:
+    store = _master(request)
     try:
         return JSONResponse(store.list_experiences())
     finally:
@@ -326,8 +341,8 @@ def master_list_experiences() -> JSONResponse:
 
 
 @app.post("/api/master/experiences")
-async def master_add_experience(entry: dict) -> JSONResponse:
-    store = _master()
+async def master_add_experience(request: Request, entry: dict) -> JSONResponse:
+    store = _master(request)
     try:
         entry_id = store.add_experience(
             title=entry.get("title", ""),
@@ -345,8 +360,8 @@ async def master_add_experience(entry: dict) -> JSONResponse:
 
 
 @app.delete("/api/master/experiences/{entry_id}")
-def master_delete_experience(entry_id: int) -> JSONResponse:
-    store = _master()
+def master_delete_experience(request: Request, entry_id: int) -> JSONResponse:
+    store = _master(request)
     try:
         if not store.delete_experience(entry_id):
             raise HTTPException(404, "Experience not found")
@@ -356,8 +371,8 @@ def master_delete_experience(entry_id: int) -> JSONResponse:
 
 
 @app.get("/api/master/projects")
-def master_list_projects() -> JSONResponse:
-    store = _master()
+def master_list_projects(request: Request) -> JSONResponse:
+    store = _master(request)
     try:
         return JSONResponse(store.list_projects())
     finally:
@@ -365,8 +380,8 @@ def master_list_projects() -> JSONResponse:
 
 
 @app.post("/api/master/projects")
-async def master_add_project(entry: dict) -> JSONResponse:
-    store = _master()
+async def master_add_project(request: Request, entry: dict) -> JSONResponse:
+    store = _master(request)
     try:
         entry_id = store.add_project(
             name=entry.get("name", ""),
@@ -382,8 +397,8 @@ async def master_add_project(entry: dict) -> JSONResponse:
 
 
 @app.delete("/api/master/projects/{entry_id}")
-def master_delete_project(entry_id: int) -> JSONResponse:
-    store = _master()
+def master_delete_project(request: Request, entry_id: int) -> JSONResponse:
+    store = _master(request)
     try:
         if not store.delete_project(entry_id):
             raise HTTPException(404, "Project not found")
@@ -393,8 +408,8 @@ def master_delete_project(entry_id: int) -> JSONResponse:
 
 
 @app.get("/api/master/skills")
-def master_list_skills() -> JSONResponse:
-    store = _master()
+def master_list_skills(request: Request) -> JSONResponse:
+    store = _master(request)
     try:
         return JSONResponse(store.list_skills())
     finally:
@@ -402,8 +417,8 @@ def master_list_skills() -> JSONResponse:
 
 
 @app.post("/api/master/skills")
-async def master_add_skills(payload: dict) -> JSONResponse:
-    store = _master()
+async def master_add_skills(request: Request, payload: dict) -> JSONResponse:
+    store = _master(request)
     try:
         added = store.add_skills(payload.get("category", "other"), payload.get("names", []))
         return JSONResponse({"added": added})
@@ -412,15 +427,15 @@ async def master_add_skills(payload: dict) -> JSONResponse:
 
 
 @app.post("/api/master/import-resume")
-async def master_import_resume(payload: dict) -> JSONResponse:
+async def master_import_resume(request: Request, payload: dict) -> JSONResponse:
     """Import a stored web resume into the master DB (rich parse)."""
     from applyjin.web.master_store import import_from_resume_text
 
     resume_id = payload.get("resume_id")
     if not resume_id:
         raise HTTPException(400, "resume_id required")
-    web = _store()
-    master = _master()
+    web = _store(request)
+    master = _master(request)
     try:
         resume = web.get_resume(int(resume_id))
         if not resume:
@@ -443,7 +458,7 @@ def public_stats() -> JSONResponse:
     """Aggregated, non-sensitive numbers for the landing page."""
     from applyjin.agents.tracker import Tracker
 
-    store = _store()
+    store = _global_store()
     try:
         tracker = Tracker(DB_PATH)
         try:
@@ -473,7 +488,7 @@ async def join_waitlist(
     email = email.strip().lower()
     if not _EMAIL_RE.match(email):
         raise HTTPException(400, "That email address doesn't look right.")
-    store = _store()
+    store = _global_store()
     try:
         row_id, message = store.add_waitlist(email, source or "landing")
         if row_id is None:
@@ -487,7 +502,7 @@ async def join_waitlist(
 
 
 @app.post("/api/resumes/upload")
-async def upload_resume(
+async def upload_resume(request: Request, 
     file: UploadFile = File(...), name: str = Form("")
 ) -> JSONResponse:
     from applyjin.utils.resume_parser import parse_resume_text
@@ -507,7 +522,7 @@ async def upload_resume(
 
     profile = load_profile()
     parsed = parse_resume_text(text, profile)
-    store = _store()
+    store = _store(request)
     try:
         resume_id = store.add_resume(
             name=name or Path(file.filename).stem,
@@ -532,7 +547,7 @@ def _extract_text(path: Path) -> str:
 
 
 @app.post("/api/resumes/create")
-async def create_resume(
+async def create_resume(request: Request, 
     name: str = Form(...), content: str = Form(...)
 ) -> JSONResponse:
     if not content.strip():
@@ -541,7 +556,7 @@ async def create_resume(
 
     profile = load_profile()
     parsed = parse_resume_text(content, profile)
-    store = _store()
+    store = _store(request)
     try:
         resume_id = store.add_resume(
             name=name or "Pasted resume",
@@ -555,8 +570,8 @@ async def create_resume(
 
 
 @app.get("/api/resumes")
-def list_resumes() -> JSONResponse:
-    store = _store()
+def list_resumes(request: Request) -> JSONResponse:
+    store = _store(request)
     try:
         return JSONResponse(store.list_resumes())
     finally:
@@ -564,8 +579,8 @@ def list_resumes() -> JSONResponse:
 
 
 @app.get("/api/resumes/{resume_id}")
-def get_resume(resume_id: int) -> JSONResponse:
-    store = _store()
+def get_resume(request: Request, resume_id: int) -> JSONResponse:
+    store = _store(request)
     try:
         resume = store.get_resume(resume_id)
         if not resume:
@@ -576,8 +591,8 @@ def get_resume(resume_id: int) -> JSONResponse:
 
 
 @app.delete("/api/resumes/{resume_id}")
-def delete_resume(resume_id: int) -> JSONResponse:
-    store = _store()
+def delete_resume(request: Request, resume_id: int) -> JSONResponse:
+    store = _store(request)
     try:
         if not store.delete_resume(resume_id):
             raise HTTPException(404, "Resume not found")
@@ -590,12 +605,12 @@ def delete_resume(resume_id: int) -> JSONResponse:
 
 
 @app.post("/api/job-descriptions")
-async def add_jd(
+async def add_jd(request: Request, 
     title: str = Form(...), company: str = Form(...), content: str = Form(...)
 ) -> JSONResponse:
     if len(content.strip()) < 30:
         raise HTTPException(400, "JD content too short")
-    store = _store()
+    store = _store(request)
     try:
         jd_id = store.add_jd(title, company, content)
         # Run ghost-job scoring on the new JD
@@ -608,8 +623,8 @@ async def add_jd(
 
 
 @app.get("/api/job-descriptions")
-def list_jds() -> JSONResponse:
-    store = _store()
+def list_jds(request: Request) -> JSONResponse:
+    store = _store(request)
     try:
         return JSONResponse(store.list_jds())
     finally:
@@ -617,8 +632,8 @@ def list_jds() -> JSONResponse:
 
 
 @app.get("/api/job-descriptions/{jd_id}")
-def get_jd(jd_id: int) -> JSONResponse:
-    store = _store()
+def get_jd(request: Request, jd_id: int) -> JSONResponse:
+    store = _store(request)
     try:
         jd = store.get_jd(jd_id)
         if not jd:
@@ -634,10 +649,10 @@ def get_jd(jd_id: int) -> JSONResponse:
 
 
 @app.post("/api/job-descriptions/{jd_id}/extract-keywords")
-def extract_keywords(jd_id: int) -> JSONResponse:
+def extract_keywords(request: Request, jd_id: int) -> JSONResponse:
     from applyjin.web.pipeline import extract_keywords as run
 
-    store = _store()
+    store = _store(request)
     try:
         jd = store.get_jd(jd_id)
         if not jd:
@@ -653,12 +668,12 @@ def extract_keywords(jd_id: int) -> JSONResponse:
 
 
 @app.post("/api/applications")
-async def create_application(
+async def create_application(request: Request, 
     resume_id: int = Form(...), jd_id: int = Form(...)
 ) -> JSONResponse:
     from applyjin.web.pipeline import extract_keywords, score_keywords_for, score_pair
 
-    store = _store()
+    store = _store(request)
     try:
         resume = store.get_resume(resume_id)
         jd = store.get_jd(jd_id)
@@ -710,8 +725,8 @@ def _json_dump(value) -> str:
 
 
 @app.get("/api/applications")
-def list_applications() -> JSONResponse:
-    store = _store()
+def list_applications(request: Request) -> JSONResponse:
+    store = _store(request)
     try:
         return JSONResponse(store.list_applications())
     finally:
@@ -719,8 +734,8 @@ def list_applications() -> JSONResponse:
 
 
 @app.get("/api/applications/{app_id}")
-def get_application(app_id: int) -> JSONResponse:
-    store = _store()
+def get_application(request: Request, app_id: int) -> JSONResponse:
+    store = _store(request)
     try:
         record = store.get_application(app_id)
         if not record:
@@ -731,7 +746,7 @@ def get_application(app_id: int) -> JSONResponse:
 
 
 @app.post("/api/applications/{app_id}/tailor")
-async def tailor_application(
+async def tailor_application(request: Request, 
     app_id: int, selected_keywords: str = Form("[]")
 ) -> JSONResponse:
     import json as _json
@@ -747,7 +762,7 @@ async def tailor_application(
     from applyjin.web.tailor_v3 import tailor_from_master
     from applyjin.resume.extract import extract_requirements
 
-    store = _store()
+    store = _store(request)
     try:
         record = store.get_application(app_id)
         if not record:
@@ -762,7 +777,7 @@ async def tailor_application(
         except ValueError:
             selected = []
 
-        master = _master()
+        master = _master(request)
         try:
             master_stats = master.stats()
             has_master = master_stats["experiences"] + master_stats["projects"] > 0
@@ -875,7 +890,7 @@ async def tailor_application(
 
 
 @app.post("/api/applications/{app_id}/email-template")
-def generate_email_template(
+def generate_email_template(request: Request, 
     app_id: int,
     template_type: str = Form("application"),
 ) -> JSONResponse:
@@ -889,7 +904,7 @@ def generate_email_template(
     if template_type not in ("application", "follow_up", "thank_you", "inquiry"):
         raise HTTPException(400, "template_type must be application|follow_up|thank_you|inquiry")
 
-    store = _store()
+    store = _store(request)
     try:
         record = store.get_application(app_id)
         if not record:
@@ -898,7 +913,7 @@ def generate_email_template(
         if not jd:
             raise HTTPException(404, "JD not found")
 
-        master = _master()
+        master = _master(request)
         try:
             profile = master.get_profile()
         finally:
@@ -928,11 +943,11 @@ def generate_email_template(
 
 
 @app.get("/api/job-descriptions/{jd_id}/contacts")
-def jd_contacts(jd_id: int) -> JSONResponse:
+def jd_contacts(request: Request, jd_id: int) -> JSONResponse:
     """Emails + hiring manager extracted from a stored JD."""
     from applyjin.web.tailor_v3 import extract_contacts
 
-    store = _store()
+    store = _store(request)
     try:
         jd = store.get_jd(jd_id)
         if not jd:
@@ -943,10 +958,10 @@ def jd_contacts(jd_id: int) -> JSONResponse:
 
 
 @app.post("/api/applications/{app_id}/cover-letter")
-def generate_cover_letter(app_id: int) -> JSONResponse:
+def generate_cover_letter(request: Request, app_id: int) -> JSONResponse:
     from applyjin.web.pipeline import cover_letter as run
 
-    store = _store()
+    store = _store(request)
     try:
         record = store.get_application(app_id)
         if not record:
@@ -962,10 +977,10 @@ def generate_cover_letter(app_id: int) -> JSONResponse:
         store.close()
 
 
-def _master_anchors() -> tuple[str, str]:
+def _master_anchors(request: Request) -> tuple[str, str]:
     """(name, email) from the master profile — the resume's identity anchors."""
     try:
-        master = _master()
+        master = _master(request)
         try:
             profile = master.get_profile() or {}
             return (profile.get("full_name") or ""), (profile.get("email") or "")
@@ -976,11 +991,11 @@ def _master_anchors() -> tuple[str, str]:
 
 
 @app.get("/api/applications/{app_id}/download-resume")
-def download_resume(app_id: int) -> FileResponse:
+def download_resume(request: Request, app_id: int) -> FileResponse:
     from applyjin.resume.qa import qa_pdf, render_pdf_with_qa
     from applyjin.web.pipeline import to_pdf
 
-    store = _store()
+    store = _store(request)
     try:
         record = store.get_application(app_id)
         if not record or not record.get("tailored_resume_md"):
@@ -991,7 +1006,7 @@ def download_resume(app_id: int) -> FileResponse:
         # browser-print fallback. The report always ships in a response
         # header so the client can see what was actually produced.
         md_text = record["tailored_resume_md"]
-        name, email = _master_anchors()
+        name, email = _master_anchors(request)
         pdf, report, final_md = render_pdf_with_qa(
             md_text,
             PDF_DIR / f"latex_resume_{app_id}.pdf",
@@ -1021,7 +1036,7 @@ def download_resume(app_id: int) -> FileResponse:
 
 
 @app.get("/api/applications/{app_id}/resume-qa")
-def resume_qa(app_id: int) -> dict:
+def resume_qa(request: Request, app_id: int) -> dict:
     """Physical QA for the current resume without downloading it.
 
     Compiles to a scratch PDF, runs the page/text/anchor checks (and the
@@ -1030,13 +1045,13 @@ def resume_qa(app_id: int) -> dict:
     from applyjin.resume.qa import render_pdf_with_qa
     from applyjin.resume.render import estimate_md_lines
 
-    store = _store()
+    store = _store(request)
     try:
         record = store.get_application(app_id)
         if not record or not record.get("tailored_resume_md"):
             raise HTTPException(404, "Tailored resume not found — tailor first")
         md_text = record["tailored_resume_md"]
-        name, email = _master_anchors()
+        name, email = _master_anchors(request)
         pdf, report, final_md = render_pdf_with_qa(
             md_text,
             PDF_DIR / f"qa_resume_{app_id}.pdf",
@@ -1054,14 +1069,14 @@ def resume_qa(app_id: int) -> dict:
 
 
 @app.get("/api/applications/{app_id}/download-resume-latex")
-def download_resume_latex(app_id: int) -> FileResponse:
+def download_resume_latex(request: Request, app_id: int) -> FileResponse:
     """Editable LaTeX source bundle (.tex + resume.cls) for Overleaf etc."""
     import zipfile
     from pathlib import Path as _Path
 
     from applyjin.utils.latex_generator import latex_bundle, markdown_to_latex
 
-    store = _store()
+    store = _store(request)
     try:
         record = store.get_application(app_id)
         if not record or not record.get("tailored_resume_md"):
@@ -1077,14 +1092,14 @@ def download_resume_latex(app_id: int) -> FileResponse:
 
 
 @app.get("/api/applications/{app_id}/download-cover-letter")
-def download_cover_letter(app_id: int) -> FileResponse:
+def download_cover_letter(request: Request, app_id: int) -> FileResponse:
     from applyjin.utils.latex_generator import (
         compile_tex,
         cover_letter_to_latex,
     )
     from applyjin.web.pipeline import to_pdf
 
-    store = _store()
+    store = _store(request)
     try:
         record = store.get_application(app_id)
         if not record or not record.get("cover_letter_md"):
@@ -1161,7 +1176,7 @@ def decisions(limit: int = 20) -> list[dict]:
 
 
 @app.post("/api/copilot/chat")
-async def copilot_chat(payload: dict) -> JSONResponse:
+async def copilot_chat(request: Request, payload: dict) -> JSONResponse:
     """RAG-grounded chat copilot. Context: Master CV + ChromaDB + JD."""
     from applyjin.utils.llm_router import LLMUnavailable
     from applyjin.web.master_store import MasterStore
@@ -1171,7 +1186,7 @@ async def copilot_chat(payload: dict) -> JSONResponse:
     if not user_message:
         raise HTTPException(400, "Message is required")
 
-    store = _store()
+    store = _store(request)
     try:
         # Build context
         jd_text = ""
@@ -1187,7 +1202,7 @@ async def copilot_chat(payload: dict) -> JSONResponse:
                 store.add_copilot_message(app_id, "user", user_message)
 
         # Master CV context
-        master = _master()
+        master = _master(request)
         try:
             snapshot = master.snapshot()
         finally:
@@ -1288,9 +1303,9 @@ your facts, say it's not in the Master CV."""
 
 
 @app.get("/api/copilot/history/{app_id}")
-def copilot_history(app_id: int) -> JSONResponse:
+def copilot_history(request: Request, app_id: int) -> JSONResponse:
     """Chat history for an application."""
-    store = _store()
+    store = _store(request)
     try:
         return JSONResponse(store.get_copilot_history(app_id))
     finally:
@@ -1301,9 +1316,9 @@ def copilot_history(app_id: int) -> JSONResponse:
 
 
 @app.get("/api/pipeline")
-def get_pipeline() -> JSONResponse:
+def get_pipeline(request: Request) -> JSONResponse:
     """Applications grouped by pipeline status for the Kanban board."""
-    store = _store()
+    store = _store(request)
     try:
         return JSONResponse(store.list_pipeline())
     finally:
@@ -1311,10 +1326,10 @@ def get_pipeline() -> JSONResponse:
 
 
 @app.post("/api/pipeline/{app_id}/status")
-async def update_pipeline_status(app_id: int, payload: dict) -> JSONResponse:
+async def update_pipeline_status(request: Request, app_id: int, payload: dict) -> JSONResponse:
     """Move an application to a new pipeline status."""
     status = payload.get("status", "")
-    store = _store()
+    store = _store(request)
     try:
         record = store.get_application(app_id)
         if not record:
@@ -1329,12 +1344,12 @@ async def update_pipeline_status(app_id: int, payload: dict) -> JSONResponse:
 
 
 @app.post("/api/linkedin/generate")
-async def generate_linkedin(payload: dict) -> JSONResponse:
+async def generate_linkedin(request: Request, payload: dict) -> JSONResponse:
     """Generate LinkedIn headline + About section from Master CV."""
     from applyjin.utils.llm_router import LLMUnavailable
     from applyjin.web.master_store import MasterStore
 
-    master = _master()
+    master = _master(request)
     try:
         snapshot = master.snapshot()
     finally:

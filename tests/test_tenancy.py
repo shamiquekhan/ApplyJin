@@ -288,3 +288,34 @@ class TestConstructorIsFailClosed:
             WebStore(tmp_path / "x.db", user_id=0)
         with pytest.raises(ValueError):
             MasterStore(tmp_path / "x.db", user_id=-1)
+
+
+# ----------------------------------------------------------------- principal
+
+
+class TestAPIPrincipal:
+    def _request(self):
+        from starlette.requests import Request
+
+        return Request({"type": "http", "method": "GET", "path": "/", "headers": []})
+
+    def test_local_mode_maps_to_local_user(self, monkeypatch):
+        from applyjin.web.app import _current_user_id
+        from applyjin.web.tenancy import LOCAL_USER_ID
+
+        monkeypatch.delenv("GOOGLE_CLIENT_ID", raising=False)
+        assert _current_user_id(self._request()) == LOCAL_USER_ID
+
+    def test_auth_mode_requires_session_user(self, monkeypatch):
+        import pytest
+        from fastapi import HTTPException
+
+        from applyjin.web.app import _current_user_id
+
+        monkeypatch.setenv("GOOGLE_CLIENT_ID", "x")
+        with pytest.raises(HTTPException) as exc:
+            _current_user_id(self._request())
+        assert exc.value.status_code == 401
+        req = self._request()
+        req.state.user = {"id": 42, "email": "a@b.c"}
+        assert _current_user_id(req) == 42

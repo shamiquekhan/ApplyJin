@@ -744,6 +744,7 @@ async def tailor_application(
     from hermes.web.master_store import MasterStore
     from hermes.web.selection import select_for_jd
     from hermes.web.tailor_v3 import tailor_from_master
+    from hermes.resume.extract import extract_requirements
 
     store = _store()
     try:
@@ -770,9 +771,16 @@ async def tailor_application(
                 # ---- v3: select from the master CV database
                 keywords = jd.get("keywords") or {}
                 snapshot = master.snapshot()
-                report = select_for_jd(snapshot, keywords, jd["content"])
-                # Generation is synchronous (network-bound); keep it off the
-                # event loop so the API stays responsive during tailoring.
+                # Extraction + selection + generation are all synchronous
+                # (network-bound); keep them off the event loop so the API
+                # stays responsive during tailoring.
+                requirements, requirements_source = await asyncio.to_thread(
+                    extract_requirements, jd["content"], keywords, router
+                )
+                report = await asyncio.to_thread(
+                    select_for_jd, snapshot, keywords, jd["content"],
+                    requirements=requirements,
+                )
                 result = await asyncio.to_thread(
                     tailor_from_master, snapshot, report, jd["content"], keywords, router
                 )
@@ -786,6 +794,18 @@ async def tailor_application(
                 ]
                 result["skill_selection"] = report.skills
                 result["gaps"] = report.missing_skills
+                result["requirement_gaps"] = report.uncovered_requirements
+                result["requirements_source"] = requirements_source
+                result["requirements"] = [
+                    {
+                        "id": r.id,
+                        "text": r.text,
+                        "category": r.category,
+                        "importance": r.importance,
+                        "covered_by": report.coverage_map.get(r.id),
+                    }
+                    for r in report.requirements
+                ]
             else:
                 # ---- legacy: raw resume + chosen keywords
                 result = await asyncio.to_thread(run_tailor, resume, jd, selected, router)
@@ -842,6 +862,11 @@ async def tailor_application(
                 "selection": result.get("selection", []),
                 "skill_selection": result.get("skill_selection", []),
                 "gaps": result.get("gaps", []),
+                "requirement_gaps": result.get("requirement_gaps", []),
+                "requirements": result.get("requirements", []),
+                "requirements_source": result.get("requirements_source"),
+                "gate": result.get("gate"),
+                "generation_path": result.get("generation_path"),
             }
         )
     finally:

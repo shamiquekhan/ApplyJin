@@ -1,9 +1,11 @@
 """Tailor v3 + email templates: build the tailored CV from the master DB.
 
-Flow (CV Forge model, grounded by the resume-tailor skill):
-  master snapshot -> selection engine -> selected content (top-3 exp,
-  top-3 projects, skills intersection) -> LLM composes the tailored CV
-  -> guardrail validation against MASTER FACTS (not just the base resume)
+Flow (Resume Engine):
+  master snapshot -> selection engine (marginal coverage over JD
+  requirements) -> ResumeIR -> planner (section order, one-page budget)
+  -> constrained LLM edits inside the IR -> deterministic render
+  -> guardrail validation + quality gate (free-markdown composition
+  escalates only if the IR edit fails)
 
 Also generates application/follow-up/thank-you email templates with
 contact extraction from the JD (CV Forge's smart-contact feature).
@@ -15,6 +17,14 @@ import logging
 import re
 from typing import Optional
 
+from hermes.inference.context import DEFAULT_CONTEXT_BUDGET
+from hermes.inference.tokens import ApproximateTokenCounter
+from hermes.inference.verification import verify_claims
+from hermes.resume.composer import compose_ir
+from hermes.resume.gate import gate
+from hermes.resume.ir import ResumeIR
+from hermes.resume.planner import ResumePlan, ir_from_selection, plan_resume
+from hermes.resume.render import render_markdown
 from hermes.utils.llm_router import LLMRouter, LLMUnavailable
 from hermes.utils.skill_match import skill_in_text
 from hermes.web.selection import SelectionReport
@@ -58,85 +68,32 @@ def extract_contacts(jd_text: str) -> dict:
 # ---------------------------------------------------------------- selection -> resume
 
 
-def _selection_to_facts(
-    snapshot: dict, report: SelectionReport
-) -> tuple[str, str]:
-    """(selected-facts text for the prompt, facts for guardrail check)"""
-    profile = snapshot.get("profile", {})
+def _plan_for(snapshot: dict, report: SelectionReport) -> ResumePlan:
+    """Selection -> ResumeIR -> one-page plan (fully deterministic)."""
+    ir = ir_from_selection(
+        snapshot,
+        selected_experience_ids=[e.id for e in report.experiences],
+        selected_project_ids=[p.id for p in report.projects],
+        requirements=report.requirements,
+        skills=report.skills,
+    )
+    return plan_resume(ir, report.requirements)
 
-    def exp_lines(entry_id) -> list[str]:
-        match = next(
-            (e for e in snapshot["experiences"] if e["id"] == entry_id), None
-        )
-        if not match:
-            return []
-        lines = [
-            f"### {match['title']} | {match.get('organization','')} | "
-            f"{match.get('start_date','')} - {match.get('end_date','')}"
-        ]
-        if match.get("location"):
-            lines[0] += f" | {match['location']}"
-        if match.get("description"):
-            lines.append(match["description"])
-        lines += [f"- {b}" for b in match.get("bullets", [])]
-        return lines
 
-    def prj_lines(entry_id) -> list[str]:
-        match = next(
-            (p for p in snapshot["projects"] if p["id"] == entry_id), None
-        )
-        if not match:
-            return []
-        lines = [f"### {match['name']} — {match.get('tech','')}"]
-        if match.get("description"):
-            lines.append(match["description"])
-        lines += [f"- {b}" for b in match.get("bullets", [])]
-        if match.get("link"):
-            lines.append(match["link"])
-        return lines
-
-    parts = [
-        f"# {profile.get('full_name', 'Candidate')}",
-        " | ".join(
-            p for p in (
-                profile.get("location"), profile.get("email"),
-                profile.get("linkedin"), profile.get("github"),
-                profile.get("website"),
-            ) if p
-        ),
-        "",
-    ]
-    if profile.get("headline") or profile.get("summary"):
-        parts.append("## Summary")
-        parts.append(profile.get("headline", ""))
-        parts.append(profile.get("summary", ""))
-        parts.append("")
-
-    parts.append("## Experience")
-    for e in report.experiences:
-        parts += exp_lines(e.id)
-    parts.append("")
-    parts.append("## Projects")
-    for p in report.projects:
-        parts += prj_lines(p.id)
-    parts.append("")
-    parts.append("## Skills")
-    parts.append(", ".join(report.skills))
-    parts.append("")
-    if snapshot.get("education"):
-        parts.append("## Education")
-        for edu in snapshot["education"]:
-            bits = [edu.get("degree", ""), edu.get("institution", "")]
-            if edu.get("end_date"):
-                bits.append(edu["end_date"])
-            parts.append("- " + " | ".join(b for b in bits if b))
-        parts.append("")
-    if snapshot.get("certifications"):
-        parts.append("## Certifications")
-        parts.append(" · ".join(c.get("name", "") for c in snapshot["certifications"]))
-        parts.append("")
-
-    return "\n".join(parts), "\n".join(parts)
+def _selection_evidence(
+    report: SelectionReport, facts_text: str, ir: Optional[ResumeIR] = None
+) -> list[tuple[str, str]]:
+    """(id, text) pairs for claim verification: per-entry provenance,
+    per-bullet provenance matching the IR evidence ids, plus the full
+    rendered selection (profile, education, certifications)."""
+    evidence = [(f"exp-{e.id}", e.text) for e in report.experiences if e.text]
+    evidence += [(f"prj-{p.id}", p.text) for p in report.projects if p.text]
+    if ir is not None:
+        for bullet in ir.all_bullets():
+            for evidence_id in bullet.evidence_ids:
+                evidence.append((evidence_id, bullet.text))
+    evidence.append(("selection", facts_text))
+    return evidence
 
 
 _TAILOR_SYSTEM = """You are an expert resume writer composing a tailored CV
@@ -177,50 +134,143 @@ def tailor_from_master(
     keywords: dict,
     router: Optional[LLMRouter],
 ) -> dict:
-    """Compose the tailored CV. LLM first; deterministic fallback if absent."""
-    facts_text, guardrail_text = _selection_to_facts(snapshot, report)
+    """Compose the tailored CV through the Resume Engine.
+
+    Primary path: planned ResumeIR -> constrained LLM edits (compose_ir)
+    -> deterministic render. Escalation: free-markdown composition (the
+    proven prompt path). Last resort: the planned render itself. Every
+    path runs guardrail validation + the quality gate.
+    """
+    plan = _plan_for(snapshot, report)
+    facts_text = render_markdown(plan.ir)
+    evidence = _selection_evidence(report, facts_text, plan.ir)
+    known_entities = {"SKILL": report.skills}
+
+    def _gate(text: str, references) -> dict:
+        return gate(
+            text,
+            plan.ir,
+            report.requirements,
+            evidence,
+            known_entities,
+            over_budget=plan.over_budget,
+            estimated_lines=plan.estimated_lines,
+            page_line_budget=plan.page_line_budget,
+            references=references,
+        ).model_dump()
 
     if router is None:
-        # Deterministic: the selection IS the resume (already JD-ranked).
+        # Deterministic: the planned selection IS the resume.
+        gate_report = _gate(facts_text, references=[])
         return {
             "tailored_resume_md": facts_text,
-            "validated": True,
-            "guardrail_violations": [],
+            "validated": gate_report["passed"],
+            "guardrail_violations": gate_report["violations"],
             "model_used": "selection-fallback",
+            "generation_path": "planned",
             "selection_summary": report.summary_lines(),
+            "claim_references": [],
+            "gate": gate_report,
         }
 
     gaps = ", ".join(report.missing_skills[:10]) or "none"
     required = ", ".join(
         keywords.get("hard_skills", []) + keywords.get("tools", [])
     ) or "n/a"
+    # Budgets are tokens end-to-end (same units as the router's
+    # context_length filtering), not raw character slices.
+    counter = ApproximateTokenCounter()
+    jd_part = counter.truncate(jd_text, DEFAULT_CONTEXT_BUDGET["job"])
+    facts_part = counter.truncate(
+        facts_text, DEFAULT_CONTEXT_BUDGET["candidate_evidence"]
+    )
     prompt = (
-        f"JOB DESCRIPTION:\n{jd_text[:5000]}\n\n"
+        f"JOB DESCRIPTION:\n{jd_part}\n\n"
         f"REQUIRED SKILLS: {required}\n"
         f"GAPS (candidate does NOT have these): {gaps}\n\n"
-        f"SELECTED CONTENT (all verified facts):\n{facts_text[:8000]}"
+        f"SELECTED CONTENT (all verified facts):\n{facts_part}"
     )
-    try:
-        response = router.complete(prompt=prompt, system=_TAILOR_SYSTEM)
-        violations = _validate(response.text, guardrail_text, report)
-        if not response.text.strip() or len(response.text.strip()) < 200:
-            raise LLMUnavailable("empty LLM response")
-        return {
-            "tailored_resume_md": response.text,
-            "validated": not violations,
-            "guardrail_violations": violations,
-            "model_used": response.model,
-            "selection_summary": report.summary_lines(),
-        }
-    except LLMUnavailable as exc:
-        logger.warning("LLM unavailable (%s) — selection fallback resume", exc)
+    if report.requirements:
+        req_lines = [
+            f"- ({r.importance:.2f}) {r.text[:100]}"
+            for r in sorted(
+                report.requirements, key=lambda r: -r.importance
+            )[:12]
+        ]
+        req_block = counter.truncate(
+            "\n".join(req_lines), DEFAULT_CONTEXT_BUDGET["instructions"]
+        )
+        prompt += (
+            f"\n\nJD REQUIREMENTS by importance (mirror the ones the "
+            f"selection supports; never claim the rest):\n{req_block}"
+        )
+    context_length = counter.count(_TAILOR_SYSTEM) + counter.count(prompt)
+
+    text: Optional[str] = None
+    model_used: Optional[str] = None
+    generation_path: Optional[str] = None
+
+    # ---- primary: constrained edits inside the structured IR
+    composed, compose_model = compose_ir(
+        plan.ir, jd_text, report.requirements, router
+    )
+    if composed is not None:
+        candidate = render_markdown(composed)
+        if len(candidate.strip()) >= 200:
+            text, model_used = candidate, compose_model
+            generation_path = "ir-compose"
+            logger.info("IR compose accepted (%s)", compose_model)
+        else:
+            logger.info("IR compose output too short — escalating")
+    elif composed is None and compose_model != "no-router":
+        logger.info("IR compose rejected (%s) — markdown escalation", compose_model)
+
+    # ---- escalation: free-markdown composition
+    if text is None:
+        try:
+            response = router.complete(
+                prompt=prompt,
+                system=_TAILOR_SYSTEM,
+                task="resume_generation",
+                context_length=context_length,
+            )
+            if len(response.text.strip()) >= 200:
+                text, model_used = response.text, response.model
+                generation_path = "markdown"
+        except LLMUnavailable as exc:
+            logger.warning("LLM unavailable (%s)", exc)
+
+    # ---- last resort: the planned render itself
+    if text is None:
+        gate_report = _gate(facts_text, references=[])
+        logger.warning("generation failed — planned-render fallback")
         return {
             "tailored_resume_md": facts_text,
-            "validated": True,
-            "guardrail_violations": [],
+            "validated": gate_report["passed"],
+            "guardrail_violations": gate_report["violations"],
             "model_used": "selection-fallback",
+            "generation_path": "planned-fallback",
             "selection_summary": report.summary_lines(),
+            "claim_references": [],
+            "gate": gate_report,
         }
+
+    violations = _validate(text, facts_text, report)
+    references = verify_claims(text, evidence, known_entities)
+    unsupported = [r.claim for r in references if not r.supported]
+    if unsupported:
+        violations.append(f"Unsupported claims: {unsupported[:3]}")
+    gate_report = _gate(text, references)
+    return {
+        "tailored_resume_md": text,
+        "validated": not violations,
+        "guardrail_violations": violations,
+        "model_used": model_used,
+        "generation_path": generation_path,
+        "selection_summary": report.summary_lines(),
+        "claim_references": [r.__dict__ for r in references],
+        "gate": gate_report,
+    }
 
 
 def _validate(
@@ -229,9 +279,10 @@ def _validate(
     """Tailored output may only contain master facts."""
     violations: list[str] = []
 
-    # 1. Gap skills must never appear
+    # 1. Gap skills must never appear — unless the selected master
+    # evidence itself mentions the term (then it's grounded, not invented).
     for gap in report.missing_skills:
-        if skill_in_text(gap, tailored_text):
+        if skill_in_text(gap, tailored_text) and not skill_in_text(gap, master_facts):
             violations.append(f"Added a skill the candidate lacks: '{gap}'")
 
     # 2. No years that aren't in the master facts

@@ -9,7 +9,12 @@ import pytest
 from hermes.utils.skill_match import skill_coverage, skill_in_text, skills_in_text
 from hermes.web.master_store import MasterStore, import_from_resume_text
 from hermes.web.selection import select_for_jd
-from hermes.web.tailor_v3 import extract_contacts, generate_email_template, tailor_from_master
+from hermes.web.tailor_v3 import (
+    _validate,
+    extract_contacts,
+    generate_email_template,
+    tailor_from_master,
+)
 
 
 @pytest.fixture
@@ -148,6 +153,81 @@ class TestMasterStore:
         store.close()
 
 
+class TestImportParsing:
+    TEXT = (
+        "# Jane Doe\n\nCity | jane@x.com\n\n"
+        "## Experience\n\n"
+        "AI Engineer Intern | Suproc\tJul 2026 – Present | Remote, India\n\n"
+        "- Built agents\n\n"
+        "## Education\n\n"
+        "### B.Tech CSE (AI & ML) — Vellore Institute of Technology"
+        " | Jul 2025 – Jul 2029 (in progress)\n"
+        "- Senior Secondary — Aligarh Muslim University"
+        " | Oct 2022 – Apr 2025 | Distinctions in 4 Subjects\n"
+    )
+
+    @pytest.fixture
+    def imported(self, tmp_path: Path) -> MasterStore:
+        store = MasterStore(tmp_path / "m.db")
+        import_from_resume_text(self.TEXT, store)
+        return store
+
+    def test_location_does_not_leak_into_dates(self, imported: MasterStore):
+        exp = imported.list_experiences()[0]
+        assert exp["start_date"] == "Jul 2026"
+        assert exp["end_date"] == "Present"  # was "Present Remote, India"
+        assert exp["location"] == "Remote, India"
+        assert exp["organization"] == "Suproc"
+        imported.close()
+
+    def test_education_degree_institution_dates_split(self, imported: MasterStore):
+        edus = imported.list_education()
+        assert len(edus) == 2
+        first = edus[0]
+        assert first["degree"] == "B.Tech CSE (AI & ML)"
+        assert first["institution"] == "Vellore Institute of Technology"
+        assert first["start_date"] == "Jul 2025"
+        assert first["end_date"] == "Jul 2029"
+        assert first["details"] == "in progress"
+        second = edus[1]
+        assert second["degree"] == "Senior Secondary"
+        assert second["institution"] == "Aligarh Muslim University"
+        assert second["start_date"] == "Oct 2022"
+        assert second["end_date"] == "Apr 2025"
+        assert second["details"] == "Distinctions in 4 Subjects"
+        imported.close()
+
+    def test_hash_experience_header_parses_dates_and_location(self, tmp_path: Path):
+        store = MasterStore(tmp_path / "m.db")
+        import_from_resume_text(
+            "# Jane Doe\n\n## Experience\n\n"
+            "### SWE | Acme | 2020 - 2023 | Remote\n\n- Built things\n",
+            store,
+        )
+        exp = store.list_experiences()[0]
+        assert exp["start_date"] == "2020"
+        assert exp["end_date"] == "2023"
+        assert exp["location"] == "Remote"
+        store.close()
+
+
+class TestValidate:
+    def test_gap_mention_without_evidence_flagged(self, master: MasterStore):
+        report = select_for_jd(master.snapshot(), AGENT_KEYWORDS, AGENT_JD)
+        assert "FastAPI" in report.missing_skills
+        violations = _validate("Built FastAPI services", "Python, Docker", report)
+        assert any("FastAPI" in v for v in violations)
+
+    def test_gap_mention_supported_by_evidence_allowed(self, master: MasterStore):
+        report = select_for_jd(master.snapshot(), AGENT_KEYWORDS, AGENT_JD)
+        violations = _validate(
+            "shipped with FastAPI",
+            "Built and deployed FastAPI services in production",
+            report,
+        )
+        assert violations == []
+
+
 # ---------------------------------------------------------------- selection
 
 
@@ -185,6 +265,7 @@ class TestTailorV3:
         result = tailor_from_master(master.snapshot(), report, AGENT_JD, AGENT_KEYWORDS, router=None)
         assert result["model_used"] == "selection-fallback"
         assert result["validated"] is True
+        assert result["claim_references"] == []
         md = result["tailored_resume_md"]
         assert "Shamique Khan" in md
         assert "AI Engineer Intern" in md
@@ -196,7 +277,7 @@ class TestTailorV3:
         report = select_for_jd(master.snapshot(), AGENT_KEYWORDS, AGENT_JD)
 
         class FabricatingRouter:
-            def complete(self, prompt, system=""):
+            def complete(self, prompt, system="", task="generation", context_length=0):
                 from hermes.models import LLMResponse
 
                 return LLMResponse(
@@ -220,6 +301,108 @@ class TestTailorV3:
         assert "FastAPI" in violations  # a listed gap
         assert "1998" in violations  # invented dates
         assert "Hogwarts" in violations  # invented organization
+
+    def test_claim_verification_runs_and_flags_fabricated_metric(self, master: MasterStore):
+        report = select_for_jd(master.snapshot(), AGENT_KEYWORDS, AGENT_JD)
+
+        class Router:
+            def complete(self, prompt, system="", task="generation", context_length=0):
+                from hermes.models import LLMResponse
+
+                return LLMResponse(
+                    text=(
+                        "# Shamique Khan\n\n## Summary\n"
+                        "AI engineer building LLM agents and RAG pipelines for production use.\n\n"
+                        "## Experience\n\n### AI Engineer Intern | Suproc | Jul 2026 - Present\n\n"
+                        "- Architected 4+ multi-model LLM agents in Python with LangGraph\n"
+                        "- Improved throughput by 340% across the whole platform\n\n"
+                        "## Skills\n\nPython, LangGraph, RAG\n"
+                    ),
+                    model="fake", provider="fake",
+                )
+
+        result = tailor_from_master(
+            master.snapshot(), report, AGENT_JD, AGENT_KEYWORDS, router=Router(),
+        )
+        refs = result["claim_references"]
+        assert refs, "typed claim verification must run on the v3 path"
+        grounded = [r for r in refs if "Architected" in r["claim"]]
+        assert grounded and grounded[0]["supported"] is True
+        assert grounded[0]["evidence_id"].startswith("exp-")
+        fabricated = [r for r in refs if "340%" in r["claim"]]
+        assert fabricated and fabricated[0]["supported"] is False
+        assert fabricated[0]["claim_type"] == "METRIC"
+        assert not result["validated"]
+        assert any("Unsupported claims" in v for v in result["guardrail_violations"])
+
+    def test_token_budgets_and_context_length(self, master: MasterStore):
+        from hermes.inference.context import DEFAULT_CONTEXT_BUDGET
+        from hermes.inference.tokens import ApproximateTokenCounter
+
+        report = select_for_jd(master.snapshot(), AGENT_KEYWORDS, AGENT_JD)
+        captured = {}
+
+        class Router:
+            def complete(self, prompt, system="", task="generation", context_length=0):
+                from hermes.models import LLMResponse
+
+                captured.update(
+                    prompt=prompt, system=system, task=task,
+                    context_length=context_length,
+                )
+                return LLMResponse(
+                    text="# Shamique Khan\n\n" + (
+                        "Grounded resume line with plenty of words to pass validation. "
+                    * 6
+                    ),
+                    model="fake", provider="fake",
+                )
+
+        huge_jd = "JD requirement word " * 3000  # far beyond the 2500-token job budget
+        tailor_from_master(
+            master.snapshot(), report, huge_jd, AGENT_KEYWORDS, router=Router(),
+        )
+        counter = ApproximateTokenCounter()
+        assert counter.count(huge_jd) > DEFAULT_CONTEXT_BUDGET["job"]
+        jd_section = captured["prompt"].split("JOB DESCRIPTION:\n", 1)[1].split(
+            "\n\nREQUIRED SKILLS", 1
+        )[0]
+        assert counter.count(jd_section) <= DEFAULT_CONTEXT_BUDGET["job"]
+        assert captured["task"] == "resume_generation"
+        assert captured["context_length"] >= counter.count(captured["prompt"])
+        assert captured["context_length"] > DEFAULT_CONTEXT_BUDGET["job"]
+
+    def test_ir_compose_path_edits_structured_bullets(self, master: MasterStore):
+        import json as _json
+
+        report = select_for_jd(master.snapshot(), AGENT_KEYWORDS, AGENT_JD)
+
+        class IRRouter:
+            def complete(self, prompt, system="", task="generation", context_length=0):
+                from hermes.models import LLMResponse
+
+                payload = _json.loads(prompt.split("RESUME JSON:\n", 1)[1])
+                payload["experience"][0]["bullets"][0]["text"] = (
+                    "Shipped LangGraph agents in Python used daily by the team"
+                )
+                return LLMResponse(
+                    text=_json.dumps(payload), model="fake-ir", provider="fake",
+                )
+
+        result = tailor_from_master(
+            master.snapshot(), report, AGENT_JD, AGENT_KEYWORDS,
+            router=IRRouter(),
+        )
+        assert result["model_used"] == "fake-ir"
+        assert "Shipped LangGraph agents" in result["tailored_resume_md"]
+        assert result["validated"] is True
+        assert result["gate"]["passed"] is True
+        assert 0.0 < result["gate"]["coverage_ratio"] <= 1.0
+        refs = result["claim_references"]
+        assert refs
+        grounded = [r for r in refs if "Shipped LangGraph" in r["claim"]]
+        assert grounded and grounded[0]["supported"] is True
+        assert grounded[0]["evidence_id"].startswith("exp-")
 
 
 # ---------------------------------------------------------------- contacts + email

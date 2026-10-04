@@ -62,3 +62,4 @@ Thumbs.db
 /.claude/
 /.cursor/
 data/auth_secret
+data/master.db

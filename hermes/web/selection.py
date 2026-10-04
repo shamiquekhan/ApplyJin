@@ -4,13 +4,15 @@ The master CV holds everything; a tailored CV shows only the most
 relevant slice. For each experience/project we score:
 
     keyword hits (JD hard skills + tools present in the entry text)
-    + 0.5 x semantic similarity (embedding of entry vs JD)
+    + 0.3 x semantic similarity (embedding of entry vs JD)
 
-Top-3 experiences and top-3 projects are selected; the skills section
-is the intersection of master skills with JD requirements (plus the
-skills used by the selected entries). This is deterministic — the same
-master DB + JD always selects the same content — and it feeds the
-tailor prompt with rich, full-detail source material.
+Selection is greedy marginal coverage over JD requirements when they are
+supplied (each pick maximizes newly covered requirement importance, with
+base relevance as tie-break), falling back to plain top-3 by score. The
+skills section is the intersection of master skills with JD requirements
+(plus the skills used by the selected entries). This is deterministic —
+the same master DB + JD always selects the same content — and it feeds
+the tailor prompt with rich, full-detail source material.
 """
 
 from __future__ import annotations
@@ -19,10 +21,18 @@ import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
+from hermes.resume.coverage import (
+    CoverageItem,
+    requirement_covers,
+    select_by_marginal_coverage,
+)
+from hermes.resume.requirements import Requirement
 from hermes.utils.embeddings import cosine_similarity, get_embeddings
-from hermes.utils.skill_match import skills_in_text
+from hermes.utils.skill_match import skill_in_text, skills_in_text
 
 logger = logging.getLogger("hermes.selection")
+
+_SKILLISH_CATEGORIES = {"TECHNICAL_SKILL", "TOOL", "FRAMEWORK"}
 
 
 @dataclass
@@ -43,6 +53,9 @@ class SelectionReport:
     missing_skills: list[str]
     ranked_all_experiences: list[RankedEntry] = field(default_factory=list)
     ranked_all_projects: list[RankedEntry] = field(default_factory=list)
+    requirements: list[Requirement] = field(default_factory=list)
+    coverage_map: dict[str, str] = field(default_factory=dict)  # req.id -> entry
+    uncovered_requirements: list[str] = field(default_factory=list)
 
     def summary_lines(self) -> list[str]:
         lines = ["Selected for this application:"]
@@ -52,6 +65,11 @@ class SelectionReport:
         for p in self.projects:
             kws = ", ".join(p.matched_keywords[:5]) or "-"
             lines.append(f"  prj: {p.title} (score {p.score:.2f} | {kws})")
+        if self.requirements:
+            covered = len(self.coverage_map)
+            lines.append(
+                f"  requirements: {covered}/{len(self.requirements)} covered"
+            )
         if self.skills:
             lines.append(f"  skills: {', '.join(self.skills[:10])}")
         if self.missing_skills:
@@ -112,10 +130,27 @@ def select_for_jd(
     jd_text: str,
     top_experiences: int = 3,
     top_projects: int = 3,
+    requirements: Optional[list[Requirement]] = None,
 ) -> SelectionReport:
-    """Select the best master-DB slice for this job description."""
+    """Select the best master-DB slice for this job description.
+
+    With `requirements`, selection is greedy marginal coverage across both
+    pools (per-kind budgets kept); otherwise plain top-N by score.
+    """
     required = list(keywords.get("hard_skills", [])) + list(keywords.get("tools", []))
     soft = list(keywords.get("soft_skills", []))
+
+    # LLM-extracted requirements may surface skill concepts the cached
+    # keyword buckets missed — they count toward skills and gaps too.
+    if requirements:
+        for req in requirements:
+            if (
+                req.category in _SKILLISH_CATEGORIES
+                and req.normalized
+                and len(req.normalized) <= 40
+                and req.normalized not in required
+            ):
+                required.append(req.normalized)
 
     emb = get_embeddings()
     jd_vec = emb.embed(jd_text[:2000])
@@ -128,6 +163,49 @@ def select_for_jd(
         master_snapshot.get("projects", []), "project",
         required, jd_text, top_projects, jd_vec,
     )
+
+    coverage_map: dict[str, str] = {}
+    uncovered: list[str] = []
+    if requirements:
+        items = [
+            CoverageItem(
+                key=f"exp-{e.id}", kind="experience", text=e.text,
+                base_score=e.score,
+            )
+            for e in all_exp
+        ] + [
+            CoverageItem(
+                key=f"prj-{p.id}", kind="project", text=p.text,
+                base_score=p.score,
+            )
+            for p in all_prj
+        ]
+        picked = select_by_marginal_coverage(
+            items,
+            requirements,
+            budgets={"experience": top_experiences, "project": top_projects},
+        )
+        picked_keys = {i.key for i in picked}
+        # Presentation stays score-ordered; coverage decides membership.
+        top_exp = [e for e in all_exp if f"exp-{e.id}" in picked_keys]
+        top_prj = [p for p in all_prj if f"prj-{p.id}" in picked_keys]
+
+        any_text = " ".join(
+            _entry_text(e, k)
+            for entries, k in (
+                (master_snapshot.get("experiences", []), "experience"),
+                (master_snapshot.get("projects", []), "project"),
+            )
+            for e in entries
+        )
+        for req in requirements:
+            by_entry = next(
+                (i.key for i in picked if requirement_covers(req, i.text)), None
+            )
+            if by_entry:
+                coverage_map[req.id] = by_entry
+            elif not requirement_covers(req, any_text):
+                uncovered.append(req.text)
 
     # Skills section: master skills that the JD asks for, plus skills
     # actually used in the selected entries (they earned their place).
@@ -155,4 +233,7 @@ def select_for_jd(
         experiences=top_exp, projects=top_prj,
         skills=selected_skills, missing_skills=missing,
         ranked_all_experiences=all_exp, ranked_all_projects=all_prj,
+        requirements=list(requirements or []),
+        coverage_map=coverage_map,
+        uncovered_requirements=uncovered,
     )

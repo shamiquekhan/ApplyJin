@@ -18,12 +18,65 @@ Tables (in data/hermes.db alongside the tracker):
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from hermes.utils.skill_match import skills_in_text
+
+_DATE_TOKEN = r"Present|(?:[A-Za-z]{3,9}\.?\s+)?(?:19|20)\d{2}"
+
+
+def _clean_date_token(text: str) -> str:
+    """Pull just the date from a token like 'Present Remote, India'."""
+    m = re.search(_DATE_TOKEN, text or "")
+    return m.group(0).strip() if m else ""
+
+
+def _split_date_range(seg: str) -> tuple[str, str, str]:
+    """(start, end, leftover) from 'Jul 2025 – Jul 2029 (in progress)'."""
+    seg = seg or ""
+    m = re.search(rf"({_DATE_TOKEN})\s*[–-]\s*({_DATE_TOKEN})", seg)
+    if m:
+        leftover = (seg[: m.start()] + seg[m.end():]).strip(" \t,;|()[]")
+        return m.group(1).strip(), m.group(2).strip(), leftover
+    single = _clean_date_token(seg)
+    if single:
+        return "", single, ""
+    return "", "", seg.strip()
+
+
+def _parse_education_header(header: list[str]) -> tuple[str, str, str, str, str]:
+    """degree, institution, start, end, details from '###' or '- ' segments.
+
+    Handles 'degree — institution | dates | notes' as well as the
+    'degree | institution | dates' convention.
+    """
+    segs = [s.strip() for s in header if s and s.strip()]
+    if not segs:
+        return "", "", "", "", ""
+    degree = segs[0]
+    segs = segs[1:]
+    institution = ""
+    dash = re.search(r"\s[—–]\s", degree)
+    if dash:
+        institution = degree[dash.end():].strip()
+        degree = degree[:dash.start()].strip()
+    start = end = ""
+    notes: list[str] = []
+    for seg in segs:
+        s, e, leftover = _split_date_range(seg)
+        if s or e:
+            start, end = s, e
+            if leftover:
+                notes.append(leftover)
+        elif not institution:
+            institution = seg
+        else:
+            notes.append(seg)
+    return degree, institution, start, end, " ".join(notes)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS master_profile (
@@ -422,12 +475,16 @@ def import_from_resume_text(text: str, store: MasterStore) -> dict:
                         d for d in re.split(r"\s*[–-]\s*", all_dates)
                         if re.search(r"(?:19|20)\d{2}|Present", d)
                     ]
+                    end_raw = (
+                        date_bits[1] if len(date_bits) > 1
+                        else ("Present" if "Present" in all_dates else "")
+                    )
                     entry = {
                         "title": pipe_parts[0].split("\t")[0].strip(),
                         "organization": org,
                         "location": loc,
-                        "start_date": date_bits[0] if date_bits else "",
-                        "end_date": date_bits[1] if len(date_bits) > 1 else ("Present" if "Present" in all_dates else ""),
+                        "start_date": _clean_date_token(date_bits[0]) if date_bits else "",
+                        "end_date": _clean_date_token(end_raw),
                         "bullets": [],
                     }
                 else:
@@ -449,11 +506,15 @@ def import_from_resume_text(text: str, store: MasterStore) -> dict:
             flush_entry(store, entry, section)
             header = [p.strip() for p in ent_m.group(1).split("|")]
             if section == "experience":
+                start_date = end_date = ""
+                if len(header) > 2:
+                    start_date, end_date, _ = _split_date_range(header[2])
                 entry = {
                     "title": header[0] if header else "",
                     "organization": header[1] if len(header) > 1 else "",
-                    "start_date": header[2].split("–")[0].strip() if len(header) > 2 else "",
-                    "end_date": header[2].split("–")[-1].strip() if len(header) > 2 else "",
+                    "location": header[3] if len(header) > 3 else "",
+                    "start_date": start_date,
+                    "end_date": end_date,
                     "bullets": [],
                 }
             elif section == "projects":
@@ -463,10 +524,15 @@ def import_from_resume_text(text: str, store: MasterStore) -> dict:
                     "bullets": [],
                 }
             else:
+                degree, institution, start_date, end_date, details = (
+                    _parse_education_header(header)
+                )
                 store.add_education(
-                    degree=header[0] if header else "",
-                    institution=header[1] if len(header) > 1 else "",
-                    end_date=header[2] if len(header) > 2 else "",
+                    degree=degree,
+                    institution=institution,
+                    start_date=start_date,
+                    end_date=end_date,
+                    details=details,
                 )
                 imported["education"] += 1
                 entry = None
@@ -484,12 +550,17 @@ def import_from_resume_text(text: str, store: MasterStore) -> dict:
                         "other", [n.strip() for n in content.split(",") if n.strip()]
                     )
             elif section == "education":
-                # "- Degree | Institution | dates" or plain line
+                # "- Degree | Institution | dates | notes" or "degree — inst"
                 parts = [p.strip() for p in content.split("|")]
+                degree, institution, start_date, end_date, details = (
+                    _parse_education_header(parts)
+                )
                 store.add_education(
-                    degree=parts[0] if parts else content,
-                    institution=parts[1] if len(parts) > 1 else "",
-                    end_date=" ".join(parts[2:]) if len(parts) > 2 else "",
+                    degree=degree,
+                    institution=institution,
+                    start_date=start_date,
+                    end_date=end_date,
+                    details=details,
                 )
                 imported["education"] += 1
             elif section == "certifications":

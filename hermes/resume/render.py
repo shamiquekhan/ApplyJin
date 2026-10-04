@@ -14,7 +14,9 @@ organization guardrail parses.
 
 from __future__ import annotations
 
-from hermes.resume.ir import ExperienceIR, ProjectIR, ResumeIR
+import math
+
+from hermes.resume.ir import WORDS_PER_LINE, ExperienceIR, ProjectIR, ResumeIR
 
 
 def _experience_line(entry: ExperienceIR) -> str:
@@ -34,6 +36,24 @@ def _project_line(entry: ProjectIR) -> str:
     if entry.tech:
         return f"### {entry.name} — {entry.tech}"
     return f"### {entry.name}" if entry.name else ""
+
+
+def estimate_md_lines(md: str) -> int:
+    """Estimate rendered lines for a *markdown document* (not an IR).
+
+    Mirrors the planner's wrap model — every non-empty line costs
+    max(1, ceil(words / WORDS_PER_LINE)) — so free-markdown output can be
+    measured against the same one-page budget the planner uses. The PDF
+    page count (hermes.resume.qa) remains the physical ground truth.
+    """
+    total = 0
+    for raw in md.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        words = len(line.split())
+        total += max(1, math.ceil(words / WORDS_PER_LINE))
+    return total
 
 
 def render_markdown(ir: ResumeIR) -> str:

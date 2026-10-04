@@ -961,9 +961,22 @@ def generate_cover_letter(app_id: int) -> JSONResponse:
         store.close()
 
 
+def _master_anchors() -> tuple[str, str]:
+    """(name, email) from the master profile — the resume's identity anchors."""
+    try:
+        master = _master()
+        try:
+            profile = master.get_profile() or {}
+            return (profile.get("full_name") or ""), (profile.get("email") or "")
+        finally:
+            master.close()
+    except Exception:  # noqa: BLE001 — anchors are best-effort
+        return "", ""
+
+
 @app.get("/api/applications/{app_id}/download-resume")
 def download_resume(app_id: int) -> FileResponse:
-    from hermes.utils.latex_generator import compile_tex, markdown_to_latex
+    from hermes.resume.qa import qa_pdf, render_pdf_with_qa
     from hermes.web.pipeline import to_pdf
 
     store = _store()
@@ -972,19 +985,69 @@ def download_resume(app_id: int) -> FileResponse:
         if not record or not record.get("tailored_resume_md"):
             raise HTTPException(404, "Tailored resume not found — tailor first")
 
-        # LaTeX route (Trey Hunner template) first, browser-print fallback.
+        # LaTeX route first (with physical QA: page count, extractable
+        # text, identity/section anchors, markdown repair loop), then the
+        # browser-print fallback. The report always ships in a response
+        # header so the client can see what was actually produced.
         md_text = record["tailored_resume_md"]
-        tex = markdown_to_latex(md_text)
-        latex_pdf = compile_tex(tex, PDF_DIR / f"latex_resume_{app_id}.pdf")
-        if latex_pdf is not None:
-            return FileResponse(
-                latex_pdf, filename=f"hermes_resume_{app_id}.pdf",
-                media_type="application/pdf",
-            )
-        out = to_pdf(md_text, PDF_DIR, f"resume_{app_id}")
-        if out.suffix != ".pdf":
-            raise HTTPException(503, "PDF engine unavailable — HTML fallback at " + str(out))
-        return FileResponse(out, filename=f"hermes_resume_{app_id}.pdf")
+        name, email = _master_anchors()
+        pdf, report, final_md = render_pdf_with_qa(
+            md_text,
+            PDF_DIR / f"latex_resume_{app_id}.pdf",
+            name=name,
+            email=email,
+        )
+        if pdf is None:
+            out = to_pdf(md_text, PDF_DIR, f"resume_{app_id}")
+            if out.suffix != ".pdf":
+                raise HTTPException(
+                    503, "PDF engine unavailable — HTML fallback at " + str(out)
+                )
+            pdf = out
+            report = qa_pdf(out, name=name, email=email)
+        elif final_md != md_text:
+            # Repairs changed the resume — persist so the UI and the PDF
+            # show the same document.
+            store.update_application(app_id, tailored_resume_md=final_md)
+        return FileResponse(
+            pdf,
+            filename=f"hermes_resume_{app_id}.pdf",
+            media_type="application/pdf",
+            headers={"X-Resume-QA": report.header_json()},
+        )
+    finally:
+        store.close()
+
+
+@app.get("/api/applications/{app_id}/resume-qa")
+def resume_qa(app_id: int) -> dict:
+    """Physical QA for the current resume without downloading it.
+
+    Compiles to a scratch PDF, runs the page/text/anchor checks (and the
+    repair loop) purely as a dry run — the stored resume is not modified.
+    """
+    from hermes.resume.qa import render_pdf_with_qa
+    from hermes.resume.render import estimate_md_lines
+
+    store = _store()
+    try:
+        record = store.get_application(app_id)
+        if not record or not record.get("tailored_resume_md"):
+            raise HTTPException(404, "Tailored resume not found — tailor first")
+        md_text = record["tailored_resume_md"]
+        name, email = _master_anchors()
+        pdf, report, final_md = render_pdf_with_qa(
+            md_text,
+            PDF_DIR / f"qa_resume_{app_id}.pdf",
+            name=name,
+            email=email,
+        )
+        return {
+            "report": report.model_dump(),
+            "estimated_md_lines": estimate_md_lines(md_text),
+            "repairs_needed": report.repairs,
+            "would_change_resume": final_md != md_text,
+        }
     finally:
         store.close()
 

@@ -8,7 +8,9 @@ Pipeline (structured ResumeIR fork):
     planner.py     section order, bullet priority, one-page budget
     composer.py    LLM rephrases bullets; provenance fields frozen
     render.py      deterministic ResumeIR -> Markdown (ATS sections)
+    repair.py      one-page compression hierarchy for markdown output
     gate.py        provenance + claim support + budget + coverage report
+    qa.py          physical PDF check: pages, text, anchors + repair loop
 """
 
 from hermes.resume.composer import compose_ir
@@ -48,7 +50,9 @@ from hermes.resume.planner import (
     ir_from_selection,
     plan_resume,
 )
-from hermes.resume.render import render_markdown
+from hermes.resume.qa import PdfQAReport, qa_pdf, render_pdf_with_qa
+from hermes.resume.repair import compress_to_fit, repair_step
+from hermes.resume.render import estimate_md_lines, render_markdown
 from hermes.resume.requirements import (
     ImportanceWeights,
     Requirement,
@@ -68,6 +72,7 @@ __all__ = [
     "HeaderIR",
     "ImportanceWeights",
     "PAGE_LINE_BUDGET",
+    "PdfQAReport",
     "ProjectIR",
     "Requirement",
     "RequirementCategory",
@@ -78,9 +83,11 @@ __all__ = [
     "SkillsIR",
     "SummaryIR",
     "compose_ir",
+    "compress_to_fit",
     "compute_importance",
     "coverage_ratio",
     "estimate_lines",
+    "estimate_md_lines",
     "estimate_strength",
     "evidence_from_snapshot",
     "extract_dates",
@@ -91,7 +98,10 @@ __all__ = [
     "make_requirement",
     "normalize_skill",
     "plan_resume",
+    "qa_pdf",
     "render_markdown",
+    "render_pdf_with_qa",
+    "repair_step",
     "requirement_covers",
     "requirements_from_keywords",
     "select_by_marginal_coverage",

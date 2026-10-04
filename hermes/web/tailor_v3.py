@@ -24,7 +24,8 @@ from hermes.resume.composer import compose_ir
 from hermes.resume.gate import gate
 from hermes.resume.ir import ResumeIR
 from hermes.resume.planner import ResumePlan, ir_from_selection, plan_resume
-from hermes.resume.render import render_markdown
+from hermes.resume.repair import compress_to_fit
+from hermes.resume.render import estimate_md_lines, render_markdown
 from hermes.utils.llm_router import LLMRouter, LLMUnavailable
 from hermes.utils.skill_match import skill_in_text
 from hermes.web.selection import SelectionReport
@@ -146,22 +147,35 @@ def tailor_from_master(
     evidence = _selection_evidence(report, facts_text, plan.ir)
     known_entities = {"SKILL": report.skills}
 
-    def _gate(text: str, references) -> dict:
+    def _gate(
+        text: str,
+        references,
+        *,
+        ir,
+        over_budget: bool,
+        estimated_lines: int,
+    ) -> dict:
         return gate(
             text,
-            plan.ir,
+            ir,
             report.requirements,
             evidence,
             known_entities,
-            over_budget=plan.over_budget,
-            estimated_lines=plan.estimated_lines,
+            over_budget=over_budget,
+            estimated_lines=estimated_lines,
             page_line_budget=plan.page_line_budget,
             references=references,
         ).model_dump()
 
     if router is None:
         # Deterministic: the planned selection IS the resume.
-        gate_report = _gate(facts_text, references=[])
+        gate_report = _gate(
+            facts_text,
+            references=[],
+            ir=plan.ir,
+            over_budget=plan.over_budget,
+            estimated_lines=plan.estimated_lines,
+        )
         return {
             "tailored_resume_md": facts_text,
             "validated": gate_report["passed"],
@@ -211,11 +225,20 @@ def tailor_from_master(
     generation_path: Optional[str] = None
 
     # ---- primary: constrained edits inside the structured IR
+    active_plan = plan
     composed, compose_model = compose_ir(
         plan.ir, jd_text, report.requirements, router
     )
     if composed is not None:
-        candidate = render_markdown(composed)
+        # The composer may lengthen bullets; the system — never the LLM —
+        # owns space: re-derive every cost from the FINAL text, then
+        # re-fit to the page budget (drops lowest-importance bullets,
+        # re-trims an over-long summary) before rendering.
+        composed.recalculate_space()
+        active_plan = plan_resume(
+            composed, report.requirements, plan.page_line_budget
+        )
+        candidate = render_markdown(active_plan.ir)
         if len(candidate.strip()) >= 200:
             text, model_used = candidate, compose_model
             generation_path = "ir-compose"
@@ -242,7 +265,13 @@ def tailor_from_master(
 
     # ---- last resort: the planned render itself
     if text is None:
-        gate_report = _gate(facts_text, references=[])
+        gate_report = _gate(
+            facts_text,
+            references=[],
+            ir=plan.ir,
+            over_budget=plan.over_budget,
+            estimated_lines=plan.estimated_lines,
+        )
         logger.warning("generation failed — planned-render fallback")
         return {
             "tailored_resume_md": facts_text,
@@ -255,12 +284,31 @@ def tailor_from_master(
             "gate": gate_report,
         }
 
+    # Free-markdown output has no IR to re-fit — measure the actual
+    # document and compress it (repair hierarchy) until it fits the
+    # one-page budget, then gate on the measured line count.
+    if generation_path == "markdown":
+        text = compress_to_fit(
+            text, estimate_md_lines, plan.page_line_budget, max_steps=12
+        )
+        final_lines = estimate_md_lines(text)
+        final_over = final_lines > plan.page_line_budget
+    else:
+        final_lines = active_plan.estimated_lines
+        final_over = active_plan.over_budget
+
     violations = _validate(text, facts_text, report)
     references = verify_claims(text, evidence, known_entities)
     unsupported = [r.claim for r in references if not r.supported]
     if unsupported:
         violations.append(f"Unsupported claims: {unsupported[:3]}")
-    gate_report = _gate(text, references)
+    gate_report = _gate(
+        text,
+        references,
+        ir=active_plan.ir,
+        over_budget=final_over,
+        estimated_lines=final_lines,
+    )
     return {
         "tailored_resume_md": text,
         "validated": not violations,

@@ -231,6 +231,23 @@ class TestResumeIR:
         assert estimate_lines("one two three") == 1
         assert estimate_lines(" ".join(["w"] * 24)) == 3  # ceil(24/11)
 
+    def test_recalculate_space_follows_final_text(self):
+        # The composer may lengthen a bullet after the planner cost it;
+        # recalculate_space() re-derives the cost from the CURRENT text.
+        resume = self._resume()
+        bullet = resume.all_bullets()[0]
+        assert bullet.space_cost == 1
+        bullet.text = " ".join(["expanded"] * 60)
+        assert bullet.space_cost == 1  # frozen until re-derived
+        resume.recalculate_space()
+        assert bullet.space_cost == 6  # ceil(60/11)
+
+    def test_recalculate_space_marks_empty_as_free(self):
+        resume = self._resume()
+        resume.all_bullets()[0].text = ""
+        resume.recalculate_space()
+        assert resume.all_bullets()[0].space_cost == 0
+
     def test_json_round_trip(self):
         resume = self._resume()
         again = ResumeIR.model_validate_json(resume.model_dump_json())

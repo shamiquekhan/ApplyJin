@@ -135,6 +135,18 @@ class ResumeIR(BaseModel):
             for bullet in entry.bullets
         ]
 
+    def recalculate_space(self) -> None:
+        """Derive every bullet's space_cost from its CURRENT text.
+
+        The planner costs bullets from the pre-composition text, and the
+        composer is allowed to lengthen them. The system — never the LLM —
+        owns the budget, so costs are re-derived from the final text
+        before any fit check. Summary/section costs in `total_space()`
+        already derive from live text.
+        """
+        for bullet in self.all_bullets():
+            bullet.space_cost = estimate_lines(bullet.text)
+
     def evidence_ids(self) -> list[str]:
         return sorted(
             {

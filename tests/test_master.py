@@ -404,6 +404,89 @@ class TestTailorV3:
         assert grounded and grounded[0]["supported"] is True
         assert grounded[0]["evidence_id"].startswith("exp-")
 
+    def test_compose_space_drift_recost_and_refit(self, master: MasterStore):
+        import json as _json
+
+        from hermes.web.tailor_v3 import _plan_for
+
+        report = select_for_jd(master.snapshot(), AGENT_KEYWORDS, AGENT_JD)
+        baseline = _plan_for(master.snapshot(), report).estimated_lines
+
+        class ExpandingRouter:
+            def complete(self, prompt, system="", task="generation",
+                         context_length=0):
+                from hermes.models import LLMResponse
+
+                payload = _json.loads(prompt.split("RESUME JSON:\n", 1)[1])
+                for entry in payload["experience"] + payload["projects"]:
+                    for bullet in entry["bullets"]:
+                        # Repeat the grounded original 8x: ~10x the words,
+                        # so without recost the planner would still believe
+                        # the original (tiny) estimate. Claims stay verbatim
+                        # so support checks still pass.
+                        bullet["text"] = (bullet["text"] + " ") * 8
+                        bullet["text"] = bullet["text"].strip()
+                return LLMResponse(
+                    text=_json.dumps(payload), model="fake-expand",
+                    provider="fake",
+                )
+
+        result = tailor_from_master(
+            master.snapshot(), report, AGENT_JD, AGENT_KEYWORDS,
+            router=ExpandingRouter(),
+        )
+        assert result["generation_path"] == "ir-compose"
+        lines = result["gate"]["estimated_lines"]
+        # Recost saw the expansion (well above the pre-LLM baseline), and
+        # the re-fit dropped bullets until the budget holds again.
+        assert lines > baseline
+        assert lines <= 46
+        assert result["gate"]["over_budget"] is False
+        # Some bullets were dropped by the re-fit, some survived.
+        assert result["tailored_resume_md"].count("\n- ") >= 1
+        assert result["gate"]["passed"] is True, result["gate"]["violations"]
+
+    def test_markdown_path_measured_and_compressed(self, master: MasterStore):
+        from hermes.resume.render import estimate_md_lines
+
+        report = select_for_jd(master.snapshot(), AGENT_KEYWORDS, AGENT_JD)
+        bullets = "\n".join(
+            f"- made the system better with number {i} and more words"
+            for i in range(50)
+        )
+        giant_md = (
+            "# Shamique Khan\nIndia | a@b.co\n\n"
+            "## Experience\n### AI Engineer Intern | Suproc | Jul 2026 - Present\n"
+            + bullets + "\n\n## Skills\nPython, LangGraph\n"
+        )
+        assert estimate_md_lines(giant_md) > 46
+
+        class MDRouter:
+            def complete(self, prompt, system="", task="generation",
+                         context_length=0):
+                from hermes.models import LLMResponse
+
+                if "RESUME JSON:" in prompt:
+                    return LLMResponse(
+                        text="this is not json " * 30, model="fake-md",
+                        provider="fake",
+                    )
+                return LLMResponse(text=giant_md, model="fake-md",
+                                    provider="fake")
+
+        result = tailor_from_master(
+            master.snapshot(), report, AGENT_JD, AGENT_KEYWORDS,
+            router=MDRouter(),
+        )
+        assert result["generation_path"] == "markdown"
+        final_lines = estimate_md_lines(result["tailored_resume_md"])
+        # The gate reports the MEASURED document, not the pre-LLM plan.
+        assert result["gate"]["estimated_lines"] == final_lines
+        assert final_lines < estimate_md_lines(giant_md)  # repaired
+        assert result["gate"]["over_budget"] == (final_lines > 46)
+        if not result["gate"]["over_budget"]:
+            assert final_lines <= 46
+
 
 # ---------------------------------------------------------------- contacts + email
 
@@ -584,3 +667,73 @@ class TestMasterEndpoints:
         contacts = client.get(f"/api/job-descriptions/{jid}/contacts").json()
         assert "careers@agentco.com" in contacts["emails"]
         assert contacts["hiring_manager"] == "Sarah Johnson"
+
+    def _tailored_app(self, client) -> int:
+        rid = client.post(
+            "/api/resumes/create",
+            data={"name": "R", "content": (
+                "# Jane Doe | jane@example.com\n\n"
+                "## Relevant Skills\n\n- LLM: Python, LangGraph, RAG\n\n"
+                "## Experience\n\n### AI Eng | Acme | 2024 - Present\n\n"
+                "- Built LangGraph agents and RAG pipelines\n"
+            )},
+        ).json()["id"]
+        jid = client.post(
+            "/api/job-descriptions",
+            data={"title": "AI Engineer", "company": "AgentCo",
+                  "content": AGENT_JD},
+        ).json()["id"]
+        client.post("/api/master/import-resume", json={"resume_id": rid})
+        app_id = client.post(
+            "/api/applications", data={"resume_id": rid, "jd_id": jid}
+        ).json()["id"]
+        client.post(
+            f"/api/applications/{app_id}/tailor",
+            data={"selected_keywords": '["Python", "RAG"]'},
+        )
+        return app_id
+
+    def test_download_ships_physical_qa_header(self, client):
+        import json as _json
+
+        app_id = self._tailored_app(client)
+        resp = client.get(f"/api/applications/{app_id}/download-resume")
+        assert resp.status_code == 200, resp.text
+        assert resp.content[:5] == b"%PDF-"
+        qa = _json.loads(resp.headers["X-Resume-QA"])
+        assert qa["pages"] >= 1
+        assert isinstance(qa["passed"], bool)
+        assert "repairs" in qa
+
+    def test_resume_qa_endpoint_dry_run(self, client):
+        import json as _json  # noqa: F401
+
+        app_id = client.post(
+            "/api/applications",
+            data={
+                "resume_id": client.post(
+                    "/api/resumes/create",
+                    data={"name": "R", "content": "# X\n\n- stuff"},
+                ).json()["id"],
+                "jd_id": client.post(
+                    "/api/job-descriptions",
+                    data={"title": "T", "company": "C",
+                          "content": AGENT_JD},
+                ).json()["id"],
+            },
+        ).json()["id"]
+        # nothing tailored yet
+        assert client.get(
+            f"/api/applications/{app_id}/resume-qa"
+        ).status_code == 404
+
+        client.post(
+            f"/api/applications/{app_id}/tailor",
+            data={"selected_keywords": '["Python"]'},
+        )
+        resp = client.get(f"/api/applications/{app_id}/resume-qa")
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["report"]["pages"] >= 1
+        assert isinstance(body["estimated_md_lines"], int)
+        assert isinstance(body["would_change_resume"], bool)

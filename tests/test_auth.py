@@ -197,3 +197,137 @@ class TestAuthGate:
         )
         assert resp.status_code in (301, 302, 307, 308)
         assert "/auth/callback#error=" in resp.headers["location"]
+
+
+class TestOAuthStateHardening:
+    """Mandatory + browser-bound + one-shot state on the Google callback."""
+
+    @pytest.fixture
+    def client(self, monkeypatch, tmp_path):
+        fastapi_test = pytest.importorskip("fastapi.testclient")
+        from applyjin.web import app as web_module
+
+        monkeypatch.setattr(web_module, "DB_PATH", tmp_path / "web.db")
+        monkeypatch.setattr(web_module, "UPLOAD_DIR", tmp_path / "uploads")
+        monkeypatch.setattr(web_module, "PDF_DIR", tmp_path / "pdfs")
+        monkeypatch.setattr(web_module, "_router", lambda: None)
+        monkeypatch.setenv("GOOGLE_CLIENT_ID", "x")
+        monkeypatch.setenv("FRONTEND_URL", "https://fe.example.com")
+        monkeypatch.setattr("applyjin.web.auth._SECRET", None)
+        return fastapi_test.TestClient(web_module.app)
+
+    @staticmethod
+    def _state_from(resp) -> str:
+        from urllib.parse import parse_qs, urlparse
+
+        return parse_qs(urlparse(resp.headers["location"]).query)["state"][0]
+
+    def test_login_binds_state_to_cookie(self, client):
+        from applyjin.web import auth as auth_mod
+
+        resp = client.get("/api/auth/google", follow_redirects=False)
+        assert resp.status_code in (301, 302, 307, 308)
+        state = self._state_from(resp)
+        set_cookie = resp.headers.get_list("set-cookie")
+        assert any(
+            auth_mod.STATE_COOKIE in c and state in c for c in set_cookie
+        ), set_cookie
+        cookie_line = next(c for c in set_cookie if auth_mod.STATE_COOKIE in c)
+        assert "HttpOnly" in cookie_line
+        assert "SameSite=lax" in cookie_line
+
+    def test_missing_state_rejected(self, client):
+        resp = client.get("/api/auth/google/callback?code=x", follow_redirects=False)
+        assert "#error=bad_state" in resp.headers["location"]
+
+    def test_state_without_cookie_rejected(self, client):
+        from applyjin.web import auth as auth_mod
+
+        state = auth_mod.make_state()
+        resp = client.get(
+            f"/api/auth/google/callback?code=x&state={state}",
+            follow_redirects=False,
+        )
+        assert "#error=bad_state" in resp.headers["location"]
+
+    def test_cookie_mismatch_rejected(self, client):
+        from applyjin.web import auth as auth_mod
+
+        state = auth_mod.make_state()
+        resp = client.get(
+            f"/api/auth/google/callback?code=x&state={state}",
+            cookies={auth_mod.STATE_COOKIE: auth_mod.make_state()},
+            follow_redirects=False,
+        )
+        assert "#error=bad_state" in resp.headers["location"]
+
+    def test_forged_state_with_forged_cookie_rejected(self, client):
+        from applyjin.web import auth as auth_mod
+
+        resp = client.get(
+            "/api/auth/google/callback?code=x&state=forged.1234",
+            cookies={auth_mod.STATE_COOKIE: "forged.1234"},
+            follow_redirects=False,
+        )
+        assert "#error=bad_state" in resp.headers["location"]
+
+    def test_expired_state_rejected_even_with_cookie(self, client, monkeypatch):
+        import time as _time
+
+        from applyjin.web import auth as auth_mod
+
+        state = auth_mod.make_state()
+        real_time = _time.time
+        monkeypatch.setattr(_time, "time", lambda: real_time() + 3600)
+        resp = client.get(
+            f"/api/auth/google/callback?code=x&state={state}",
+            cookies={auth_mod.STATE_COOKIE: state},
+            follow_redirects=False,
+        )
+        assert "#error=bad_state" in resp.headers["location"]
+
+    def test_happy_path_consumes_cookie_and_mints_token(self, client, monkeypatch):
+        from applyjin.web import auth as auth_mod
+
+        async def fake_exchange(code, callback_base):
+            return {
+                "sub": "g-1", "email": "signed-in@example.com",
+                "name": "Signed In", "picture": "",
+            }
+
+        monkeypatch.setattr(auth_mod, "exchange_code", fake_exchange)
+        state = auth_mod.make_state()
+        resp = client.get(
+            f"/api/auth/google/callback?code=x&state={state}",
+            cookies={auth_mod.STATE_COOKIE: state},
+            follow_redirects=False,
+        )
+        assert "#token=" in resp.headers["location"]
+        set_cookie = resp.headers.get_list("set-cookie")
+        assert any(
+            auth_mod.STATE_COOKIE in c and "Max-Age=0" in c for c in set_cookie
+        ), set_cookie
+
+    def test_replay_after_consumption_rejected(self, client, monkeypatch):
+        from applyjin.web import auth as auth_mod
+
+        async def fake_exchange(code, callback_base):
+            return {
+                "sub": "g-1", "email": "signed-in@example.com",
+                "name": "Signed In", "picture": "",
+            }
+
+        monkeypatch.setattr(auth_mod, "exchange_code", fake_exchange)
+        state = auth_mod.make_state()
+        # first use succeeds (cookie present), replay without cookie fails
+        ok = client.get(
+            f"/api/auth/google/callback?code=x&state={state}",
+            cookies={auth_mod.STATE_COOKIE: state},
+            follow_redirects=False,
+        )
+        assert "#token=" in ok.headers["location"]
+        replay = client.get(
+            f"/api/auth/google/callback?code=x&state={state}",
+            follow_redirects=False,
+        )
+        assert "#error=bad_state" in replay.headers["location"]

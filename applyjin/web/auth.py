@@ -116,6 +116,9 @@ def verify_token(token: str) -> dict:
 
 # ---------------------------------------------------------------- state (CSRF)
 
+STATE_COOKIE = "applyjin_oauth_state"
+STATE_MAX_AGE = 600  # seconds — matches check_state's default window
+
 
 def _sign_state(data: str) -> str:
     sig = hmac.new(_secret().encode(), data.encode(), hashlib.sha256).hexdigest()[:16]
@@ -126,7 +129,7 @@ def make_state() -> str:
     return _sign_state(f"{int(time.time())}:{secrets.token_urlsafe(8)}")
 
 
-def check_state(state: str, max_age_seconds: int = 600) -> bool:
+def check_state(state: str, max_age_seconds: int = STATE_MAX_AGE) -> bool:
     try:
         data, sig = state.rsplit(".", 1)
         if not hmac.compare_digest(_sign_state(data), state):
@@ -135,6 +138,39 @@ def check_state(state: str, max_age_seconds: int = 600) -> bool:
         return abs(time.time() - ts) < max_age_seconds
     except Exception:  # noqa: BLE001
         return False
+
+
+def set_state_cookie(response, state: str, *, secure: bool) -> None:
+    """Bind the OAuth state to this browser (login hop)."""
+    response.set_cookie(
+        STATE_COOKIE,
+        state,
+        max_age=STATE_MAX_AGE,
+        path="/",
+        httponly=True,
+        samesite="lax",
+        secure=secure,
+    )
+
+
+def clear_state_cookie(response, *, secure: bool) -> None:
+    """One-shot state: the cookie is consumed by the callback hop."""
+    response.delete_cookie(
+        STATE_COOKIE,
+        path="/",
+        secure=secure,
+        httponly=True,
+        samesite="lax",
+    )
+
+
+def state_matches(query_state: str, cookie_state: str, *, max_age_seconds: int = STATE_MAX_AGE) -> bool:
+    """Mandatory + browser-bound + signed + fresh. Every check must pass."""
+    if not query_state or not cookie_state:
+        return False
+    if not hmac.compare_digest(query_state, cookie_state):
+        return False
+    return check_state(query_state, max_age_seconds=max_age_seconds)
 
 
 # ---------------------------------------------------------------- users

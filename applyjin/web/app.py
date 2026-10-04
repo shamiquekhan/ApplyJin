@@ -124,36 +124,60 @@ def _callback_base(request: Request) -> str:
     return f"{proto}://{host}"
 
 
+def _is_https(request: Request) -> bool:
+    return request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
+
+
 @app.get("/api/auth/google")
 def google_login(request: Request):
     """Start sign-in: redirect the browser to Google's consent screen."""
     if not _auth.auth_enabled():
         raise HTTPException(503, "Sign-in is not configured on this instance")
-    return RedirectResponse(
-        _auth.google_login_url(_callback_base(request), _auth.make_state())
+    state = _auth.make_state()
+    response = RedirectResponse(
+        _auth.google_login_url(_callback_base(request), state)
     )
+    _auth.set_state_cookie(response, state, secure=_is_https(request))
+    return response
 
 
 @app.get("/api/auth/google/callback")
 async def google_callback(request: Request):
     """Google returns here with ?code=... — exchange, upsert, mint JWT,
-    then redirect to the frontend with the token in the #fragment."""
+    then redirect to the frontend with the token in the #fragment.
+
+    The OAuth state is mandatory and browser-bound: the query state must be
+    present, match the cookie set at login, carry a valid signature, and be
+    fresh. The cookie is consumed here (one-shot).
+    """
     code = request.query_params.get("code", "")
     state = request.query_params.get("state", "")
+    cookie_state = request.cookies.get(_auth.STATE_COOKIE, "")
+    secure = _is_https(request)
+
+    def _fail(error: str) -> RedirectResponse:
+        response = RedirectResponse(
+            f"{_auth.frontend_url()}/auth/callback#error={error}"
+        )
+        _auth.clear_state_cookie(response, secure=secure)
+        return response
+
     if not code:
-        return RedirectResponse(f"{_auth.frontend_url()}/auth/callback#error=missing_code")
-    if state and not _auth.check_state(state):
-        return RedirectResponse(f"{_auth.frontend_url()}/auth/callback#error=bad_state")
+        return _fail("missing_code")
+    if not _auth.state_matches(state, cookie_state):
+        return _fail("bad_state")
 
     profile = await _auth.exchange_code(code, _callback_base(request))
     if not profile.get("email"):
-        return RedirectResponse(f"{_auth.frontend_url()}/auth/callback#error=no_email")
+        return _fail("no_email")
 
     user_id = _auth.upsert_user(
         DB_PATH, profile["sub"], profile["email"], profile["name"], profile["picture"]
     )
     token = _auth.create_token(user_id, profile["email"])
-    return RedirectResponse(f"{_auth.frontend_url()}/auth/callback#token={token}")
+    response = RedirectResponse(f"{_auth.frontend_url()}/auth/callback#token={token}")
+    _auth.clear_state_cookie(response, secure=secure)
+    return response
 
 
 @app.get("/api/auth/me")

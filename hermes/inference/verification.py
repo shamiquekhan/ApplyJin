@@ -12,7 +12,7 @@ _STOPWORDS = {
 }
 _METRIC_RE = re.compile(r"\b\d+(?:\.\d+)?%|\$\d+(?:\.\d+)?|\b\d+x\b", re.IGNORECASE)
 _DATE_RE = re.compile(r"\b(?:19|20)\d{2}\b")
-_CERTIFICATION_RE = re.compile(r"\b(certified|certification|certificate)\b", re.IGNORECASE)
+_CERTIFICATION_RE = re.compile(r"\b(certified|certification|certificate|badge)\b", re.IGNORECASE)
 _EDUCATION_RE = re.compile(r"\b(bachelor|master|phd|doctorate|university|college|degree)\b", re.IGNORECASE)
 _SKILL_RE = re.compile(r"\b(skills?|technologies|proficient|expertise)\b", re.IGNORECASE)
 _COMPANY_RE = re.compile(r"\b(?:at|@)\s+([A-Z][\w&.-]*(?:\s+[A-Z][\w&.-]*){0,3})")

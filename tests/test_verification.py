@@ -42,3 +42,16 @@ def test_typed_skill_claim_requires_a_known_candidate_skill():
         known_entities={"SKILL": ["Python"]},
     )
     assert unsupported[0].supported is False
+
+
+def test_badge_certification_is_not_typed_as_a_skill_claim():
+    # "…Skill Badge…" contains "skill" — must still classify as
+    # CERTIFICATION so the SKILL entity gate doesn't reject a real cert.
+    claim = "Google Cloud Skill Badge: Prepare Data for ML APIs"
+    assert classify_claim(claim) == "CERTIFICATION"
+    references = verify_claims(
+        f"- {claim}",
+        [("sel", "## Certifications\nGoogle Cloud Skill Badge: Prepare Data for ML APIs")],
+        known_entities={"SKILL": ["Python"]},
+    )
+    assert references[0].supported is True

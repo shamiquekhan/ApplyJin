@@ -11,8 +11,12 @@ from __future__ import annotations
 import asyncio
 import shutil
 from datetime import datetime
+import os as _os
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from applyjin.web.master_store import MasterStore
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,8 +33,6 @@ app = FastAPI(title="ApplyJin Dashboard", version="0.6.0")
 #  - dev: the Vite server on :3000 (proxied — same-origin, but allow anyway)
 #  - prod: the Vercel frontend (any *.vercel.app preview + custom domains
 #    via env). Render backend + Vercel frontend = cross-origin by design.
-import os as _os
-
 _VERCEL_PREVIEW = r"https?://.*\.vercel\.app"
 _EXTRA_ORIGINS = [
     o.strip()
@@ -103,8 +105,6 @@ if (FRONTEND_DIR / "assets").exists():
 
 
 # ---------------------------------------------------------------- auth
-
-from fastapi import Request  # noqa: E402
 
 from applyjin.web import auth as _auth  # noqa: E402
 
@@ -535,8 +535,13 @@ async def upload_resume(request: Request,
     if ext not in _allowed_ext:
         raise HTTPException(400, f"Unsupported file type: {ext}")
 
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    dest = UPLOAD_DIR / f"{datetime.utcnow():%Y%m%d%H%M%S}_{Path(file.filename).name}"
+    # File isolation: artifacts live under a per-user directory keyed by the
+    # session principal. The user id never comes from the client, and the
+    # filename is reduced to its final component (no traversal, no paths).
+    user_root = UPLOAD_DIR / str(_current_user_id(request))
+    user_root.mkdir(parents=True, exist_ok=True)
+    safe_name = Path(file.filename or "upload").name
+    dest = user_root / f"{datetime.utcnow():%Y%m%d%H%M%S}_{safe_name}"
     with open(dest, "wb") as fh:
         shutil.copyfileobj(file.file, fh)
 
@@ -781,7 +786,6 @@ async def tailor_application(request: Request,
         tailor as run_tailor,
         category_breakdown,
     )
-    from applyjin.web.master_store import MasterStore
     from applyjin.web.selection import select_for_jd
     from applyjin.web.tailor_v3 import tailor_from_master
     from applyjin.resume.extract import extract_requirements
@@ -919,7 +923,6 @@ def generate_email_template(request: Request,
     template_type: str = Form("application"),
 ) -> JSONResponse:
     """Draft an application/follow-up/thank-you email (never sends)."""
-    from applyjin.web.master_store import MasterStore
     from applyjin.web.tailor_v3 import (
         extract_contacts,
         generate_email_template as draft,
@@ -1095,8 +1098,6 @@ def resume_qa(request: Request, app_id: int) -> dict:
 @app.get("/api/applications/{app_id}/download-resume-latex")
 def download_resume_latex(request: Request, app_id: int) -> FileResponse:
     """Editable LaTeX source bundle (.tex + resume.cls) for Overleaf etc."""
-    import zipfile
-    from pathlib import Path as _Path
 
     from applyjin.utils.latex_generator import latex_bundle, markdown_to_latex
 
@@ -1134,7 +1135,7 @@ def download_cover_letter(request: Request, app_id: int) -> FileResponse:
         contact = ""
         if resume:
             raw = resume["raw_text"].splitlines()
-            non_empty = [l.strip() for l in raw if l.strip()]
+            non_empty = [ln.strip() for ln in raw if ln.strip()]
             if non_empty:
                 import re as _re
 
@@ -1203,7 +1204,6 @@ def decisions(limit: int = 20) -> list[dict]:
 async def copilot_chat(request: Request, payload: dict) -> JSONResponse:
     """RAG-grounded chat copilot. Context: Master CV + ChromaDB + JD."""
     from applyjin.utils.llm_router import LLMUnavailable
-    from applyjin.web.master_store import MasterStore
 
     app_id = payload.get("application_id")
     user_message = payload.get("message", "").strip()
@@ -1371,7 +1371,6 @@ async def update_pipeline_status(request: Request, app_id: int, payload: dict) -
 async def generate_linkedin(request: Request, payload: dict) -> JSONResponse:
     """Generate LinkedIn headline + About section from Master CV."""
     from applyjin.utils.llm_router import LLMUnavailable
-    from applyjin.web.master_store import MasterStore
 
     master = _master(request)
     try:

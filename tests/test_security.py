@@ -287,3 +287,57 @@ class TestTokenForgery:
             "/api/resumes", headers={"Authorization": f"Bearer {token}"}
         )
         assert resp.status_code == 401
+
+
+class TestUploadIsolation:
+    """Uploaded artifacts live under per-user directories; no traversal."""
+
+    def _upload(self, client, headers, filename="cv.txt", content=None):
+        text = content or (
+            "# Jane Doe\njane@example.com\n\n## Experience\n"
+            "### Engineer | Acme\n- Built REST APIs in Python for 5 years\n"
+        )
+        return client.post(
+            "/api/resumes/upload",
+            files={"file": (filename, text.encode(), "text/plain")},
+            headers=headers,
+        )
+
+    def test_uploads_are_separated_per_user(self, sec, tmp_path):
+        h_a = sec.make_user("cara")
+        h_b = sec.make_user("dave")
+        assert self._upload(sec.client, h_a).status_code == 200
+        assert self._upload(sec.client, h_b).status_code == 200
+        user_dirs = {
+            p.name for p in tmp_path.joinpath("uploads").iterdir() if p.is_dir()
+        }
+        # Two distinct per-user directories, both named by principal id.
+        assert len(user_dirs) == 2
+        assert user_dirs == {"1", "2"}
+
+    def test_traversal_filename_lands_flat_in_user_dir(self, sec, tmp_path):
+        h = sec.make_user("erin")
+        resp = self._upload(sec.client, h, filename="../../escape.txt")
+        assert resp.status_code == 200
+        uploads_root = tmp_path / "uploads"
+        # Nothing escaped the uploads root: every stored file sits inside a
+        # per-user directory, never at the root itself.
+        for p in uploads_root.rglob("*"):
+            assert p.is_dir() or uploads_root.joinpath(p.relative_to(uploads_root).parts[0], *p.relative_to(uploads_root).parts[1:-1]).is_dir()
+        stored = list((uploads_root / "1").glob("*.txt"))
+        assert len(stored) == 1
+        assert "/" not in stored[0].name and "\\" not in stored[0].name
+
+    def test_stored_path_records_user_scope(self, sec, tmp_path):
+        from applyjin.web.store import WebStore
+
+        h = sec.make_user("frank")
+        resume_id = self._upload(sec.client, h).json()["id"]
+        store = WebStore(tmp_path / "web.db", user_id=1)
+        try:
+            row = store.conn.execute(
+                "SELECT file_path FROM web_resumes WHERE id = ?", (resume_id,)
+            ).fetchone()
+            assert str(tmp_path / "uploads" / "1") in row["file_path"]
+        finally:
+            store.close()

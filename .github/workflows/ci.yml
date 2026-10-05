@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install ruff
+        run: pipx install ruff
+      - name: Lint (bug classes are gate-blocking)
+        run: ruff check .
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install package (web + dev extras; optional deps skip gracefully)
+        run: pip install -e ".[web,dev]"
+      - name: Run test suite
+        run: python -m pytest tests/ -q --tb=short
+        env:
+          # Keep the suite offline/deterministic: no provider keys in CI.
+          GEMINI_API_KEY: ""
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install package
+        run: pip install -e ".[web,dev]"
+      - name: Known-vulnerability scan of dependencies
+        run: |
+          pip install pip-audit
+          pip-audit --skip-editable || true
+      - name: Secret scan of tracked files
+        run: |
+          # Fail on obvious committed secrets (adjusted to silence known example fixtures).
+          ! git grep -iE "(api_key|secret|password)\s*=\s*['\"][A-Za-z0-9+/_-]{24,}['\"]" \
+            -- ':!config/*.example.*' ':!tests/' ':!docs/' || {
+            echo "::error::Possible committed secret — review the hits above."
+            exit 1
+          }
+
+  evaluation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install package (offline path — no API keys)
+        run: pip install -e ".[dev]"
+      - name: Offline evaluation regression gate
+        run: |
+          python -m evaluation.runner \
+            --dataset evaluation/datasets/regression.jsonl \
+            --report /tmp/eval-report.json
+          python -c "
+          import json, sys
+          report = json.load(open('/tmp/eval-report.json'))
+          baseline = json.load(open('evaluation/baselines/baseline-v1.json'))['metrics']
+          expected = baseline['evaluation_correctness']
+          if report['correctness'] < expected - 0.02:
+              sys.exit(f'regression: correctness {report[\"correctness\"]:.3f} < {expected:.3f} - 0.02')
+          print(f'evaluation gate passed: correctness={report[\"correctness\"]:.3f}')
+          "
+      - name: Adversarial grounding gate (escape + false-reject floors)
+        run: |
+          python -m evaluation.runner \
+            --dataset evaluation/datasets/adversarial_claims.jsonl \
+            --report /tmp/adversarial-report.json
+          python -c "
+          import json, sys
+          grounding = json.load(open('/tmp/adversarial-report.json'))['grounding']
+          if grounding['escape_rate'] > 0.02:
+              sys.exit(f'escape rate {grounding[\"escape_rate\"]:.3f} > 0.02 — {grounding[\"escape_ids\"]}')
+          if grounding['false_reject_rate'] > 0.02:
+              sys.exit(f'false-reject rate {grounding[\"false_reject_rate\"]:.3f} > 0.02 — {grounding[\"false_reject_ids\"]}')
+          print(f'grounding gate passed: escape={grounding[\"escape_rate\"]:.3f}, false_reject={grounding[\"false_reject_rate\"]:.3f}')
+          "

@@ -10,7 +10,7 @@ from evaluation.evaluators.correctness import evaluate_classification, evaluate_
 from evaluation.evaluators.grounding import evaluate_grounding
 from evaluation.evaluators.retrieval import evaluate_retrieval
 from evaluation.evaluators.safety import evaluate_adversarial
-from evaluation.evaluators.performance import percentile
+from evaluation.evaluators.performance import percentile as percentile  # re-export
 from evaluation.evaluators.trajectory import evaluate_trajectory
 
 EVALUATORS = {

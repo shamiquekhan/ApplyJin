@@ -7,6 +7,7 @@ import json
 import time
 from pathlib import Path
 
+from evaluation.evaluators.claims import aggregate_claim_results, evaluate_claim_case
 from evaluation.evaluators.correctness import evaluate_classification, evaluate_gating
 from evaluation.evaluators.performance import percentile
 from evaluation.evaluators.safety import evaluate_adversarial
@@ -45,6 +46,10 @@ def evaluate_case(case: dict, provider: HeuristicDecisionProvider) -> dict:
             "score": 0.0,
             "latency_ms": round((time.perf_counter() - started) * 1000, 3),
         }
+    if case_type == "claim":
+        metrics = evaluate_claim_case(case)
+        metrics["latency_ms"] = round((time.perf_counter() - started) * 1000, 3)
+        return metrics
     if case_type == "grounding":
         metrics = evaluate_grounding(
             str(case.get("output", "")), list(case.get("allowed_evidence", []))
@@ -78,7 +83,11 @@ def run(dataset: Path) -> dict:
     results = [evaluate_case(json.loads(line), provider) for line in dataset.read_text(encoding="utf-8").splitlines() if line.strip()]
     scores = [float(item.get("score", 0.0)) for item in results]
     safety = [float(item.get("score", 0.0)) for item in results if item["type"] == "adversarial"]
-    return {"cases": len(results), "correctness": sum(scores) / len(scores) if scores else 0.0, "safety": sum(safety) / len(safety) if safety else 0.0, "p95_latency_ms": percentile([float(item["latency_ms"]) for item in results], 95), "results": results}
+    report = {"cases": len(results), "correctness": sum(scores) / len(scores) if scores else 0.0, "safety": sum(safety) / len(safety) if safety else 0.0, "p95_latency_ms": percentile([float(item["latency_ms"]) for item in results], 95), "results": results}
+    claim_results = [item for item in results if item["type"] == "claim"]
+    if claim_results:
+        report["grounding"] = aggregate_claim_results(claim_results)
+    return report
 
 
 def main() -> None:
@@ -90,6 +99,14 @@ def main() -> None:
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(f"ApplyJin Evaluation: {report['cases']} cases, correctness={report['correctness']:.1%}, p95={report['p95_latency_ms']:.2f}ms")
+    grounding = report.get("grounding")
+    if grounding:
+        print(
+            f"Grounding: escape_rate={grounding['escape_rate']:.1%} "
+            f"({grounding['escapes']}/{grounding['adversarial_cases']}), "
+            f"false_reject_rate={grounding['false_reject_rate']:.1%} "
+            f"({grounding['false_rejects']}/{grounding['honest_cases']})"
+        )
 
 
 if __name__ == "__main__":

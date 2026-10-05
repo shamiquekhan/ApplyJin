@@ -17,6 +17,9 @@
     "vllm_concurrency_2_tokens_per_second": 9.83,
     "fp16_peak_gpu_memory_mb": 953.7,
     "nf4_peak_gpu_memory_mb": 452.46,
-    "qlora_heldout_loss_delta": -0.0576
+    "qlora_heldout_loss_delta": -0.0576,
+    "adversarial_claim_cases": 65,
+    "grounding_escape_rate": 0.0,
+    "grounding_false_reject_rate": 0.0
   }
 }

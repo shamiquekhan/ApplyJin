@@ -10,7 +10,7 @@ from typing import Optional
 import typer
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Confirm, Prompt
+from rich.prompt import Prompt
 from rich.table import Table
 
 from applyjin import __version__
@@ -18,10 +18,9 @@ from applyjin.config import (
     Profile,
     SearchEntry,
     load_profile,
-    load_search_configs,
 )
 from applyjin.models import JobPosting
-from applyjin.utils.llm_router import LLMRouter, LLMUnavailable, make_router
+from applyjin.utils.llm_router import LLMRouter, make_router
 
 app = typer.Typer(
     name="applyjin",
@@ -603,7 +602,7 @@ def outreach(
     from applyjin.agents.jd_analyzer import JDAnalyzer
     from applyjin.agents.outreach_agent import OutreachAgent
     from applyjin.agents.tracker import Tracker
-    from applyjin.models import JobAnalysis, JobPosting
+    from applyjin.models import JobPosting
     from datetime import datetime
 
     tracker = Tracker(Path("data/hermes.db"))

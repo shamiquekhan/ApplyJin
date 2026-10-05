@@ -12,7 +12,7 @@ import logging
 import re
 import time
 
-from applyjin.inference.base import DecisionProvider, ProviderUnavailable
+from applyjin.inference.base import DecisionProvider
 from applyjin.inference.schemas import (
     DecisionAnswer,
     DecisionRequest,

@@ -19,7 +19,6 @@ from applyjin.agents.dashboard import render
 from applyjin.agents.interview_prep import (
     InterviewPrepAgent,
     _split_star,
-    build_prep_document,
 )
 from applyjin.agents.outreach_agent import (
     LINKEDIN_NOTE_LIMIT,

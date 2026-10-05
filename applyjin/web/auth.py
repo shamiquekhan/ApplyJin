@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 import os
 import secrets
 import time
@@ -30,7 +29,7 @@ from typing import Optional
 import httpx
 import jwt as pyjwt
 from fastapi import HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse
 
 from applyjin.web.tenancy import USERS_SCHEMA as _USERS_SCHEMA
 

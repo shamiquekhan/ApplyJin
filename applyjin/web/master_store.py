@@ -455,7 +455,7 @@ def import_from_resume_text(text: str, store: MasterStore) -> dict:
     }
 
     # ---- header -> profile
-    non_empty = [l.strip() for l in lines if l.strip()]
+    non_empty = [ln.strip() for ln in lines if ln.strip()]
     if non_empty:
         name = re.sub(r"^[#*\s]+", "", non_empty[0]).strip()
         if 2 < len(name) <= 60 and not any(c.isdigit() for c in name):

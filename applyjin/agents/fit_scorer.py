@@ -13,14 +13,11 @@ import logging
 from applyjin.config import Profile
 from applyjin.models import JobAnalysis, JobPosting, ResumeDocument, ScoredJob
 from applyjin.utils.ats_scorer import (
-    keyword_match_score,
-    matched_keywords,
-    missing_keywords,
     seniority_match,
     semantic_similarity,
 )
 from applyjin.utils.ats_scorer import experience_match as _experience_match
-from applyjin.utils.skill_match import skill_coverage, skills_in_text
+from applyjin.utils.skill_match import skill_coverage
 
 logger = logging.getLogger("applyjin.fit_scorer")
 

@@ -53,7 +53,7 @@ def _trim_summary(lines: list[str]) -> tuple[list[str], bool]:
     if "summary" not in ranges:
         return lines, False
     start, end = ranges["summary"]
-    body = [l for l in lines[start + 1:end] if l.strip()]
+    body = [ln for ln in lines[start + 1:end] if ln.strip()]
     text = " ".join(body).strip()
     words = text.split()
     if len(words) <= MAX_SUMMARY_WORDS:

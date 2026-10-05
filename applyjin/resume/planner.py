@@ -261,7 +261,7 @@ def plan_resume(
         _, section, entry_index, bullet_index, _ = slots[0]
         entries = ir.projects if section == "project" else ir.experience
         entry = entries[entry_index]
-        bullet = entry.bullets.pop(bullet_index)
+        entry.bullets.pop(bullet_index)  # drop the lowest-value bullet
         dropped.append(f"{section}-{entry.id}:b{bullet_index}")
         if not entry.bullets:
             entries.pop(entry_index)

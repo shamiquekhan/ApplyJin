@@ -200,9 +200,9 @@ class TestCoverLetterTemplate:
         for tex in (resume_tex, letter_tex):
             assert "\\documentclass{resume}" in tex
         r = compile_tex(resume_tex, tmp_path / "r.pdf")
-        l = compile_tex(letter_tex, tmp_path / "l.pdf")
-        assert r and l
-        assert r.read_bytes()[:5] == l.read_bytes()[:5] == b"%PDF-"
+        letter_pdf = compile_tex(letter_tex, tmp_path / "l.pdf")
+        assert r and letter_pdf
+        assert r.read_bytes()[:5] == letter_pdf.read_bytes()[:5] == b"%PDF-"
 
 
 class TestLatexBundle:

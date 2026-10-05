@@ -105,7 +105,6 @@ def validate_tailored(
         )
 
     base_words = _extract_skill_words(resume.raw_text)
-    new_words = _extract_skill_words(tailored_text)
     original_case = set(_SKILL_WORD_RE.findall(tailored_text))
     base_original = set(_SKILL_WORD_RE.findall(resume.raw_text))
     invented_caps = [

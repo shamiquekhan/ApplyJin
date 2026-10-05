@@ -7,7 +7,6 @@ via fakes and via its unavailable path.
 
 from __future__ import annotations
 
-import json
 
 import pytest
 

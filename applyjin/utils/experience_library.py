@@ -13,11 +13,9 @@ import json
 import logging
 import math
 import re
-from pathlib import Path
-from typing import Optional
 
 from applyjin.config import DATA_DIR
-from applyjin.models import Bullet, ResumeDocument
+from applyjin.models import ResumeDocument
 from applyjin.utils.embeddings import cosine_similarity, get_embeddings
 
 logger = logging.getLogger("applyjin.experience_library")

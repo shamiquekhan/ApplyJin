@@ -158,7 +158,7 @@ def _parse_markdown(md: str) -> _Resume:
         i += 1
 
     if not parsed.sections:
-        parsed.sections = [("Experience", [l.strip() for l in lines if l.strip()])]
+        parsed.sections = [("Experience", [ln.strip() for ln in lines if ln.strip()])]
     return parsed
 
 
@@ -218,15 +218,6 @@ def _render_subsection(lines: list[str]) -> str:
 def markdown_to_latex(md: str) -> str:
     """Resume markdown -> .tex document using the resume.cls template."""
     parsed = _parse_markdown(md)
-
-    section_order = [
-        ("summary", "Summary"), ("objective", "Objective"),
-        ("education", "Education"), ("experience", "Experience"),
-        ("projects", "Projects"), ("research", "Research"),
-        ("publications", "Publications"), ("skills", "Skills"),
-        ("certifications", "Certifications"), ("courses", "Courses"),
-        ("achievements", "Achievements"),
-    ]
 
     body: list[str] = []
     for title, lines in parsed.sections:
@@ -331,7 +322,7 @@ def cover_letter_to_latex(letter_md: str, name: str = "", contact: str = "") -> 
     in_closing = False
 
     for para in paragraphs:
-        lines = [l.strip() for l in para.splitlines() if l.strip()]
+        lines = [ln.strip() for ln in para.splitlines() if ln.strip()]
         first_line = lines[0] if lines else ""
         joined = " ".join(lines)
         if in_closing:

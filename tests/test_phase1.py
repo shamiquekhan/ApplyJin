@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -217,10 +216,11 @@ class TestTailorGuardrails:
         assert any("Dates" in v for v in violations)
 
     def test_missing_skill_injection_flagged(self, resume):
-        analysis = heuristic_analyze(backend_job := JobPosting(
+        backend_job = JobPosting(
             job_id="j", title="BE", company="A",
             description="Rust, Python, Docker.",
-        ))
+        )
+        analysis = heuristic_analyze(backend_job)
         # 'Rust' is required by the JD, absent from base resume — injected = violation.
         dirty = resume.raw_text + " Expert in Rust systems programming."
         violations = validate_tailored(dirty, resume, analysis)

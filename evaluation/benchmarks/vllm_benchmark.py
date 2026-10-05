@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import os
 import time
 from pathlib import Path
 from urllib.request import urlopen

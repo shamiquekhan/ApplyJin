@@ -28,7 +28,7 @@ from applyjin.resume.coverage import (
 )
 from applyjin.resume.requirements import Requirement
 from applyjin.utils.embeddings import cosine_similarity, get_embeddings
-from applyjin.utils.skill_match import skill_in_text, skills_in_text
+from applyjin.utils.skill_match import skills_in_text
 
 logger = logging.getLogger("applyjin.selection")
 
@@ -138,7 +138,6 @@ def select_for_jd(
     pools (per-kind budgets kept); otherwise plain top-N by score.
     """
     required = list(keywords.get("hard_skills", [])) + list(keywords.get("tools", []))
-    soft = list(keywords.get("soft_skills", []))
 
     # LLM-extracted requirements may surface skill concepts the cached
     # keyword buckets missed — they count toward skills and gaps too.

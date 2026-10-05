@@ -6,8 +6,7 @@ import time
 
 import pytest
 
-from applyjin.config import LLMConfig, ChainProvider, GenerationSettings, RetrySettings
-from applyjin.models import LLMResponse
+from applyjin.config import LLMConfig, ChainProvider, RetrySettings
 from applyjin.utils.llm_router import LLMRouter
 
 
@@ -109,9 +108,7 @@ class TestProviderChain:
             ChainProvider(provider="ollama", model="ollama/x", api_key="other"),
         ]
         # Pre-seed throttle times so no waiting happens in test
-        from datetime import datetime, timedelta
         router._last_call = {}
-        import applyjin.utils.llm_router as lr
         original_sleep = time.sleep
         time.sleep = lambda s: None
         try:

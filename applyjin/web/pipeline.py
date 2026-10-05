@@ -14,7 +14,6 @@ from typing import Optional
 
 from applyjin.config import load_profile
 from applyjin.models import JobAnalysis, JobPosting, ResumeDocument
-from applyjin.utils.ats_scorer import ATSScorer
 from applyjin.utils.llm_router import LLMRouter, LLMUnavailable
 from applyjin.utils.resume_parser import parse_resume_text
 
@@ -188,7 +187,7 @@ def tailor(
     router: Optional[LLMRouter],
 ) -> dict:
     """Guardrailed tailoring. Returns markdown + validation report."""
-    from applyjin.agents.resume_tailor import ResumeTailor, validate_tailored
+    from applyjin.agents.resume_tailor import ResumeTailor
 
     profile = load_profile()
     resume_doc = _as_resume_document(resume["raw_text"], profile)
@@ -221,7 +220,6 @@ def cover_letter(
     import re as _re
 
     from applyjin.agents.cover_letter import CoverLetterAgent
-    from applyjin.utils.llm_router import LLMUnavailable
 
     profile = load_profile()
 

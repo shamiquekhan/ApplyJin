@@ -17,14 +17,14 @@ import logging
 import re
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Optional
 
 from applyjin.config import LLMConfig, RetrySettings
 from applyjin.models import LLMResponse
 from applyjin.inference.llm import run_provider
 from applyjin.inference.litellm_client import LiteLLMProvider
-from applyjin.inference.router import ModelCandidate, RoutingWeights, order_candidates
+from applyjin.inference.router import RoutingWeights, order_candidates
 from applyjin.inference.model_registry import ModelRegistry
 from applyjin.inference.vllm_client import VLLMProvider
 

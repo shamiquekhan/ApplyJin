@@ -9,7 +9,6 @@ from applyjin.resume import (
     Evidence,
     HeaderIR,
     ImportanceWeights,
-    ResumeBullet,
     ResumeIR,
     estimate_lines,
     estimate_strength,

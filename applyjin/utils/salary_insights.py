@@ -8,10 +8,7 @@ Provides salary range estimation for job titles using:
 
 from __future__ import annotations
 
-import json
 import os
-import re
-from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
@@ -66,7 +63,6 @@ _BLS_SALARIES: dict[str, int] = {
     "sales engineer": 116190,
     "solutions architect": 132270,
     "technical architect": 132270,
-    "data analyst": 82360,
 }
 
 # Location cost-of-living multipliers (relative to national average = 1.0)

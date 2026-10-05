@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import math
 import random
-from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
 
 from applyjin.agents.ab_testing import (
-    ABResult,
     assign_variant,
     analyze_variants,
     chi_squared_yates_2x2,
@@ -98,6 +96,64 @@ class TestABResult:
     def test_missing_arm(self):
         result = analyze_variants({"A": {"interview": 5, "rejected": 5}, "B": {}})
         assert result.winner == "inconclusive"
+
+
+class TestWilsonInterval:
+    def test_known_value(self):
+        from applyjin.agents.ab_testing import wilson_interval
+
+        lo, hi = wilson_interval(8, 100)
+        assert lo == pytest.approx(0.041, abs=0.005)
+        assert hi == pytest.approx(0.150, abs=0.005)
+
+    def test_bounds_stay_in_unit_interval(self):
+        from applyjin.agents.ab_testing import wilson_interval
+
+        for successes, total in [(0, 5), (5, 5), (1, 3), (0, 0), (2, 1000)]:
+            lo, hi = wilson_interval(successes, total)
+            assert 0.0 <= lo <= hi <= 1.0
+
+    def test_no_data_gives_full_interval(self):
+        from applyjin.agents.ab_testing import wilson_interval
+
+        assert wilson_interval(0, 0) == (0.0, 1.0)
+
+
+class TestDecisiveGate:
+    def test_clear_winner_is_decisive(self):
+        stats = {
+            "A": {"interview": 4, "rejected": 30, "no_response": 26},
+            "B": {"interview": 16, "rejected": 20, "no_response": 24},
+        }
+        result = analyze_variants(stats)
+        assert result.significant
+        lo, hi = result.lift_ci
+        assert lo > 0  # interval excludes zero
+        assert result.decisive
+        assert result.winner == "B"
+
+    def test_significant_but_wide_interval_is_inconclusive(self):
+        # p < 0.05 by chi-squared, but the lift interval spans zero —
+        # the data cannot yet distinguish the variants.
+        stats = {
+            "A": {"interview": 12, "rejected": 18},
+            "B": {"interview": 3, "rejected": 27},
+        }
+        result = analyze_variants(stats)
+        assert result.significant
+        lo, hi = result.lift_ci
+        assert lo <= 0 <= hi
+        assert not result.decisive
+        assert result.winner == "inconclusive"
+
+    def test_summary_reports_intervals(self):
+        stats = {
+            "A": {"interview": 4, "rejected": 30, "no_response": 26},
+            "B": {"interview": 16, "rejected": 20, "no_response": 24},
+        }
+        text = analyze_variants(stats).summary()
+        assert "95% CI" in text
+        assert "lift" in text
 
 
 # ------------------------------------------------------------ tracker p3
@@ -192,8 +248,8 @@ class TestLearningAgent:
         import shutil
 
         db = tmp_path / "hermes.db"
-        apps_dir = tmp_path / "apps"
         monkeypatch.chdir(tmp_path)
+        assert db.parent == tmp_path  # local run: db lives beside the data dir
         shutil.copytree(
             Path(__file__).parent.parent / "data", tmp_path / "data",
             dirs_exist_ok=True,

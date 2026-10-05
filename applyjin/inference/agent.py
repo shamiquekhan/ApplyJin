@@ -12,14 +12,13 @@ Traces store hashes and typed answers, never raw personal documents.
 
 from __future__ import annotations
 
-import json
 import logging
 import time
 import uuid
 from pathlib import Path
 from typing import Optional
 
-from applyjin.config import PROJECT_ROOT, DATA_DIR
+from applyjin.config import DATA_DIR
 from applyjin.inference.base import DecisionProvider
 from applyjin.inference.heuristic_provider import HeuristicDecisionProvider
 from applyjin.inference.laya_client import LayaDecisionProvider, ProviderUnavailable

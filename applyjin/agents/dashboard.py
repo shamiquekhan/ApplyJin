@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 from rich.console import Console
 from rich.panel import Panel
@@ -16,7 +15,6 @@ from rich.table import Table
 from rich.text import Text
 
 from applyjin.agents.ab_testing import analyze_variants
-from applyjin.agents.learning_agent import LearningAgent
 from applyjin.agents.tracker import Tracker
 
 console = Console()

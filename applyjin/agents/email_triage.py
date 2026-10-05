@@ -20,7 +20,6 @@ import re
 from dataclasses import dataclass, field
 from email import policy
 from email.parser import BytesParser
-from email.utils import parsedate_to_datetime
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional

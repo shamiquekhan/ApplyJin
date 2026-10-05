@@ -9,7 +9,6 @@ filled before they click submit themselves.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 logger = logging.getLogger("applyjin.browser")
 

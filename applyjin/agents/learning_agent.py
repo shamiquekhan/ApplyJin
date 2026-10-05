@@ -24,19 +24,26 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from applyjin.agents.ab_testing import ABResult, analyze_variants
+from applyjin.agents.ab_testing import (
+    INTERVIEW_STATUSES,
+    OUTCOME_STATUSES as _OUTCOME_STATUSES,
+    ABResult,
+    analyze_variants,
+)
+from applyjin.agents.stratified import (
+    StratumResult,
+    analyze_stratified,
+    format_stratified_report,
+)
 from applyjin.agents.tracker import Tracker
-from applyjin.utils.ats_scorer import missing_keywords
 
 logger = logging.getLogger("applyjin.learning")
 
 MIN_SAMPLE_SIZE = 30
-INTERVIEW_STATUSES = ("phone_screen", "interview", "offer")
+# Canonical status tuples live in ab_testing; INTERVIEW_STATUSES is
+# re-exported here for backward compatibility with existing imports.
 # Every post-submission state is learnable signal — including silence.
-_OUTCOME_STATUSES = (
-    "submitted", "no_response", "rejected", "phone_screen",
-    "interview", "offer", "declined",
-)
+_OUTCOME_STATUSES = _OUTCOME_STATUSES
 _RESPONSE_STATUSES = ("rejected", "phone_screen", "interview", "offer", "declined")
 
 _METRIC_RE = re.compile(r"\d+%|\$\d[\d,.]*|\b\d+x\b|\b\d{2,}\b", re.IGNORECASE)
@@ -53,6 +60,7 @@ class LearnReport:
     losing_keywords: list[tuple[str, float]] = field(default_factory=list)
     ats_delta_correlation: Optional[float] = None
     ab_result: Optional[ABResult] = None
+    stratified: list[StratumResult] = field(default_factory=list)
     style_guide: str = ""
     sufficient_data: bool = False
     warnings: list[str] = field(default_factory=list)
@@ -70,13 +78,16 @@ class LearnReport:
                 "(does higher ATS tailoring delta track interviews?)"
             )
         if self.winning_keywords:
-            top = ", ".join(f"{k} ({l:+.1f})" for k, l in self.winning_keywords[:6])
+            top = ", ".join(f"{kw} ({lift:+.1f})" for kw, lift in self.winning_keywords[:6])
             lines.append(f"winning_keywords: {top}")
         if self.losing_keywords:
-            top = ", ".join(f"{k} ({l:+.1f})" for k, l in self.losing_keywords[:4])
+            top = ", ".join(f"{kw} ({lift:+.1f})" for kw, lift in self.losing_keywords[:4])
             lines.append(f"losing_keywords: {top}")
         if self.ab_result:
             lines.append(f"ab_test: {self.ab_result.summary()}")
+        if self.stratified:
+            lines.append("")
+            lines.append(format_stratified_report(self.stratified))
         for warning in self.warnings:
             lines.append(f"warning: {warning}")
         return lines
@@ -139,6 +150,7 @@ class LearningAgent:
         stats = self.tracker.variant_stats()
         if stats.get("A") and stats.get("B"):
             report.ab_result = analyze_variants(stats)
+            report.stratified = analyze_stratified(records)
 
         report.sufficient_data = (
             len(records) >= self.min_sample
@@ -251,8 +263,8 @@ class LearningAgent:
                 continue
             lift.append((key, round(math.log((win_rate + 0.05) / (rej_rate + 0.05)), 3)))
         lift.sort(key=lambda kv: kv[1], reverse=True)
-        winners = [(k, l) for k, l in lift if l > 0.1][:10]
-        losers = [(k, l) for k, l in lift if l < -0.1][:6]
+        winners = [(kw, lift) for kw, lift in lift if lift > 0.1][:10]
+        losers = [(kw, lift) for kw, lift in lift if lift < -0.1][:6]
         return winners, losers
 
 
